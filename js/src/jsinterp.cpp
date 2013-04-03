@@ -1255,6 +1255,12 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
      * continue the normal bytecode processing.
      */
 
+    /* CAL Main interpret loop
+     * Like the above table says, this doesn't look like it, but it's a loop.
+     * The main loop in fact.  regs.pc += len moves the program counter (len is
+     * set from a table by the operation last executed).  The next line grabs the
+     * opcode and the switch selects the proper action.
+     */
 #else /* !JS_THREADED_INTERP */
     for (;;) {
       advance_pc_by_one:
@@ -1262,14 +1268,14 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
         len = 1;
       advance_pc:
         js::gc::MaybeVerifyBarriers(cx);
-        regs.pc += len;
-        op = (JSOp) *regs.pc;
+        regs.pc += len; // Set pc (len set by last op to execute)
+        op = (JSOp) *regs.pc; // Get the opcode
 
       do_op:
         CHECK_PCCOUNT_INTERRUPTS();
-        switchOp = int(op) | switchMask;
+        switchOp = int(op) | switchMask; // ??
       do_switch:
-        switch (switchOp) {
+        switch (switchOp) { // CAL Main instruction switch
 #endif
 
 #if JS_THREADED_INTERP
