@@ -1070,8 +1070,57 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
     JS_ASSERT(!cx->compartment->activeAnalysis);
 
+#if JS_THREADED_INTERP
+#define CHECK_PCCOUNT_INTERRUPTS() JS_ASSERT_IF(script->hasScriptCounts, jumpTable == interruptJumpTable)
+#else
 #define CHECK_PCCOUNT_INTERRUPTS() JS_ASSERT_IF(script->hasScriptCounts, switchMask == -1)
+#endif
 
+    /*
+     * Macros for threaded interpreter loop
+     */
+#if JS_THREADED_INTERP
+    static void *const normalJumpTable[] = {
+# define OPDEF(op,val,name,token,length,nuses,ndefs,prec,format) \
+        JS_EXTENSION &&L_##op,
+# include "jsopcode.tbl"
+# undef OPDEF
+    };
+
+    static void *const interruptJumpTable[] = {
+# define OPDEF(op,val,name,token,length,nuses,ndefs,prec,format)              \
+        JS_EXTENSION &&interrupt,
+# include "jsopcode.tbl"
+# undef OPDEF
+    };
+
+    register void * const *jumpTable = normalJumpTable;
+
+    typedef GenericInterruptEnabler<void * const *> InterruptEnabler;
+    InterruptEnabler interrupts(&jumpTable, interruptJumpTable);
+
+# define DO_OP()            JS_BEGIN_MACRO                                    \
+                                CHECK_PCCOUNT_INTERRUPTS();                   \
+                                JS_EXTENSION_(goto *jumpTable[op]);           \
+                            JS_END_MACRO
+# define DO_NEXT_OP(n)      JS_BEGIN_MACRO                                    \
+                                TypeCheckNextBytecode(cx, script, n, regs);   \
+                                js::gc::MaybeVerifyBarriers(cx);              \
+                                op = (JSOp) *(regs.pc += (n));                \
+                                DO_OP();                                      \
+                            JS_END_MACRO
+
+# define BEGIN_CASE(OP)     L_##OP:
+# define END_CASE(OP)       DO_NEXT_OP(OP##_LENGTH);
+# define END_VARLEN_CASE    DO_NEXT_OP(len);
+# define ADD_EMPTY_CASE(OP) BEGIN_CASE(OP)                                    \
+                                JS_ASSERT(js_CodeSpec[OP].length == 1);       \
+                                op = (JSOp) *++regs.pc;                       \
+                                DO_OP();
+
+# define END_EMPTY_CASES
+
+#else /* !JS_THREADED_INTERP */
 
     register int switchMask = 0;
     int switchOp;
@@ -1109,13 +1158,46 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 # define ADD_EMPTY_CASE(OP) BEGIN_CASE(OP)
 # define END_EMPTY_CASES    goto advance_pc_by_one;
 
+#endif /* !JS_THREADED_INTERP */
 
 #define LOAD_DOUBLE(PCOFF, dbl)                                               \
     (dbl = script->getConst(GET_UINT32_INDEX(regs.pc + (PCOFF))).toDouble())
 
+#if defined(JS_METHODJIT)
+    bool useMethodJIT = false;
+#endif
+
+#ifdef JS_METHODJIT
+
+#define RESET_USE_METHODJIT()                                                 \
+    JS_BEGIN_MACRO                                                            \
+        useMethodJIT = cx->methodJitEnabled &&                                \
+           (interpMode == JSINTERP_NORMAL ||                                  \
+            interpMode == JSINTERP_REJOIN ||                                  \
+            interpMode == JSINTERP_SKIP_TRAP);                                \
+    JS_END_MACRO
+
+#define CHECK_PARTIAL_METHODJIT(status)                                       \
+    JS_BEGIN_MACRO                                                            \
+        switch (status) {                                                     \
+          case mjit::Jaeger_UnfinishedAtTrap:                                 \
+            interpMode = JSINTERP_SKIP_TRAP;                                  \
+            /* FALLTHROUGH */                                                 \
+          case mjit::Jaeger_Unfinished:                                       \
+            op = (JSOp) *regs.pc;                                             \
+            SET_SCRIPT(regs.fp()->script());                                  \
+            if (cx->isExceptionPending())                                     \
+                goto error;                                                   \
+            DO_OP();                                                          \
+          default:;                                                           \
+        }                                                                     \
+    JS_END_MACRO
+
+#else
 
 #define RESET_USE_METHODJIT() ((void) 0)
 
+#endif
 
     /*
      * Prepare to call a user-supplied branch handler, and abort the script
@@ -1343,9 +1425,14 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
         interpMode = JSINTERP_NORMAL;
 
+#if JS_THREADED_INTERP
+        jumpTable = moreInterrupts ? interruptJumpTable : normalJumpTable;
+        JS_EXTENSION_(goto *normalJumpTable[op]);
+#else
         switchMask = moreInterrupts ? -1 : 0;
         switchOp = int(op);
         goto do_switch;
+#endif
     }
 
 /* No-ops for ease of decompilation. */
@@ -1388,6 +1475,32 @@ check_backedge:
     CHECK_BRANCH();
     if (op != JSOP_LOOPHEAD)
         DO_OP();
+
+#ifdef JS_METHODJIT
+    if (!useMethodJIT)
+        DO_OP();
+    mjit::CompileStatus status =
+        mjit::CanMethodJIT(cx, script, regs.pc, regs.fp()->isConstructing(),
+                           mjit::CompileRequest_Interpreter, regs.fp());
+    if (status == mjit::Compile_Error)
+        goto error;
+    if (status == mjit::Compile_Okay) {
+        void *ncode =
+            script->nativeCodeForPC(regs.fp()->isConstructing(), regs.pc);
+        JS_ASSERT(ncode);
+        mjit::JaegerStatus status = mjit::JaegerShotAtSafePoint(cx, ncode, true);
+        if (status == mjit::Jaeger_ThrowBeforeEnter)
+            goto error;
+        CHECK_PARTIAL_METHODJIT(status);
+        interpReturnOK = (status == mjit::Jaeger_Returned);
+        if (entryFrame != regs.fp())
+            goto jit_return;
+        regs.fp()->setFinishedInInterpreter();
+        goto leave_on_safe_point;
+    }
+    if (status == mjit::Compile_Abort)
+        useMethodJIT = false;
+#endif /* JS_METHODJIT */
 
     DO_OP();
 }
@@ -1465,6 +1578,10 @@ BEGIN_CASE(JSOP_STOP)
         else
             Probes::exitScript(cx, script, script->function(), regs.fp());
 
+        /* The JIT inlines the epilogue. */
+#ifdef JS_METHODJIT
+  jit_return:
+#endif
 
         /* The results of lowered call/apply frames need to be shifted. */
         bool shiftResult = regs.fp()->loweredCallOrApply();
@@ -2342,6 +2459,24 @@ BEGIN_CASE(JSOP_FUNCALL)
 
     SET_SCRIPT(regs.fp()->script());
     RESET_USE_METHODJIT();
+
+#ifdef JS_METHODJIT
+    if (!newType) {
+        /* Try to ensure methods are method JIT'd.  */
+        mjit::CompileStatus status = mjit::CanMethodJIT(cx, script, script->code,
+                                                        construct,
+                                                        mjit::CompileRequest_Interpreter,
+                                                        regs.fp());
+        if (status == mjit::Compile_Error)
+            goto error;
+        if (status == mjit::Compile_Okay) {
+            mjit::JaegerStatus status = mjit::JaegerShot(cx, true);
+            CHECK_PARTIAL_METHODJIT(status);
+            interpReturnOK = mjit::JaegerStatusToSuccess(status);
+            goto jit_return;
+        }
+    }
+#endif
 
     if (!regs.fp()->prologue(cx, newType))
         goto error;
@@ -3795,6 +3930,14 @@ END_CASE(JSOP_ARRAYPUSH)
     else
         Probes::exitScript(cx, script, script->function(), regs.fp());
     regs.fp()->setFinishedInInterpreter();
+
+#ifdef JS_METHODJIT
+    /*
+     * This path is used when it's guaranteed the method can be finished
+     * inside the JIT.
+     */
+  leave_on_safe_point:
+#endif
 
     gc::MaybeVerifyBarriers(cx, true);
     return interpReturnOK;

@@ -1,0 +1,3 @@
+../configure --disable-methodjit --disable-monoic --disable-optimize --disable-tests
+
+JS_THREADSAFE is not set.
