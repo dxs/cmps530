@@ -1,3 +1,8 @@
+% CMPS 530: Computer Architecture Project
+% Charles LeDoux
+
+# Original README
+
 This directory contains SpiderMonkey 17.
 
 This release is based on revision c7f42dec3730 of Mozilla ESR17:
