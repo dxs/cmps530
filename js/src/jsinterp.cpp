@@ -11,6 +11,16 @@
 
 #include "mozilla/FloatingPoint.h"
 
+// CAL Includes and Defines
+#include <map>
+#include <iostream>
+
+/* Manual tracing using individual printfs */
+#define TRACEIT 1
+/* Trace using the single printf on BEGIN_CASE*/ 
+//#define TRACEAUTO 1
+
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -1063,6 +1073,12 @@ TypeCheckNextBytecode(JSContext *cx, JSScript *script, unsigned n, const FrameRe
 JS_NEVER_INLINE bool
 js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 {
+    // CAL
+    int offset;
+    std::map<jsbytecode*, int> visited_pc;
+
+
+
     JSAutoResolveFlags rf(cx, RESOLVE_INFER);
 
     if (interpMode == JSINTERP_NORMAL)
@@ -1084,7 +1100,12 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
                                 goto advance_pc;                              \
                             JS_END_MACRO
 
-# define BEGIN_CASE(OP)     case OP:
+#ifdef TRACEAUTO
+# define BEGIN_CASE(OP)     case OP: printf(#OP); printf("\n");
+#else
+# define BEGIN_CASE(OP)     case OP: 
+#endif
+
 # define END_CASE(OP)       END_CASE_LEN(OP##_LENGTH)
 # define END_CASE_LEN(n)    END_CASE_LENX(n)
 # define END_CASE_LENX(n)   END_CASE_LEN##n
@@ -1147,6 +1168,8 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
     /* Repoint cx->regs to a local variable for faster access. */
     FrameRegs regs = cx->regs();
+    // CAL
+    jsbytecode *original_pc = regs.pc;
     PreserveRegsGuard interpGuard(cx, regs);
 
     /*
@@ -1269,7 +1292,19 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
       advance_pc:
         js::gc::MaybeVerifyBarriers(cx);
         regs.pc += len; // Set pc (len set by last op to execute)
+        if (visited_pc.count(regs.pc)){
+            visited_pc[regs.pc] += 1;
+        } else {
+            visited_pc[regs.pc] = 1;
+        }
+        offset = regs.pc - original_pc ;
         op = (JSOp) *regs.pc; // Get the opcode
+
+        /* CAL Keep track of visited pc's */
+        //printf("PC: %u\nOffset: %d\n", regs.pc, offset);
+        //printf("%d\n", offset);
+        //printf("%u\n", regs.pc);
+        //printf("%p\n", regs.pc);
 
       do_op:
         CHECK_PCCOUNT_INTERRUPTS();
@@ -1384,6 +1419,9 @@ ADD_EMPTY_CASE(JSOP_STARTXMLEXPR)
 #endif
 ADD_EMPTY_CASE(JSOP_LOOPHEAD)
 ADD_EMPTY_CASE(JSOP_LOOPENTRY)
+#ifdef TRACEIT
+printf("TRACE: EMPTY\n");
+#endif
 END_EMPTY_CASES
 
 BEGIN_CASE(JSOP_LABEL)
@@ -1403,10 +1441,16 @@ BEGIN_CASE(JSOP_LINENO)
 END_CASE(JSOP_LINENO)
 
 BEGIN_CASE(JSOP_UNDEFINED)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_UNDEFINED\n");
+#endif
     PUSH_UNDEFINED();
 END_CASE(JSOP_UNDEFINED)
 
 BEGIN_CASE(JSOP_POP)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_POP\n");
+#endif
     regs.sp--;
 END_CASE(JSOP_POP)
 
@@ -1453,6 +1497,9 @@ BEGIN_CASE(JSOP_RETURN)
 BEGIN_CASE(JSOP_RETRVAL)    /* fp return value already set */
 BEGIN_CASE(JSOP_STOP)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{RETRVAL,STOP}\n");
+#endif
     /*
      * When the inlined frame exits with an exception or an error, ok will be
      * false after the inline_return label.
@@ -1510,6 +1557,9 @@ BEGIN_CASE(JSOP_DEFAULT)
     /* FALL THROUGH */
 BEGIN_CASE(JSOP_GOTO)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{DEFAULT,GOTO}\n");
+#endif
     len = GET_JUMP_OFFSET(regs.pc);
     BRANCH(len);
 }
@@ -1654,6 +1704,9 @@ END_CASE(JSOP_ENDITER)
 
 BEGIN_CASE(JSOP_DUP)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_DUP");
+#endif
     JS_ASSERT(regs.stackDepth() >= 1);
     const Value &rref = regs.sp[-1];
     PUSH_COPY(rref);
@@ -1662,6 +1715,9 @@ END_CASE(JSOP_DUP)
 
 BEGIN_CASE(JSOP_DUP2)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_DUP2");
+#endif
     JS_ASSERT(regs.stackDepth() >= 2);
     const Value &lref = regs.sp[-2];
     const Value &rref = regs.sp[-1];
@@ -1672,6 +1728,9 @@ END_CASE(JSOP_DUP2)
 
 BEGIN_CASE(JSOP_SWAP)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_SWAP\n");
+#endif
     JS_ASSERT(regs.stackDepth() >= 2);
     Value &lref = regs.sp[-2];
     Value &rref = regs.sp[-1];
@@ -1728,7 +1787,12 @@ END_CASE(JSOP_ENUMCONSTELEM)
 #endif
 
 BEGIN_CASE(JSOP_BINDGNAME)
-    PUSH_OBJECT(regs.fp()->global());
+#ifdef TRACEIT
+        printf("TRACE: JSOP_BINDGNAME\n");
+#endif
+	/* CAL Determine which name belongs to which global variable (???)
+	 * A global object or THE global object? */
+	PUSH_OBJECT(regs.fp()->global());
 END_CASE(JSOP_BINDGNAME)
 
 BEGIN_CASE(JSOP_BINDNAME)
@@ -1840,6 +1904,9 @@ END_CASE(JSOP_CASE)
 
 BEGIN_CASE(JSOP_LT)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_LT\n");
+#endif
     bool cond;
     const Value &lref = regs.sp[-2];
     const Value &rref = regs.sp[-1];
@@ -1931,6 +1998,9 @@ END_CASE(JSOP_URSH)
 
 BEGIN_CASE(JSOP_ADD)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_ADD\n");
+#endif
     Value lval = regs.sp[-2];
     Value rval = regs.sp[-1];
     if (!AddOperation(cx, lval, rval, &regs.sp[-2]))
@@ -2025,6 +2095,9 @@ BEGIN_CASE(JSOP_NEG)
 END_CASE(JSOP_NEG)
 
 BEGIN_CASE(JSOP_POS)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_POS\n");
+#endif
     if (!ToNumber(cx, &regs.sp[-1]))
         goto error;
     if (!regs.sp[-1].isInt32())
@@ -2091,6 +2164,9 @@ END_CASE(JSOP_DELELEM)
 
 BEGIN_CASE(JSOP_TOID)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_TOID\n");
+#endif
     /*
      * Increment or decrement requires use to lookup the same property twice, but we need to avoid
      * the oberservable stringification the second time.
@@ -2124,6 +2200,11 @@ BEGIN_CASE(JSOP_INCELEM)
 BEGIN_CASE(JSOP_DECELEM)
 BEGIN_CASE(JSOP_ELEMINC)
 BEGIN_CASE(JSOP_ELEMDEC)
+{ 
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{INCELEM,DECELEM,ELEMINC,ELEMDEC} (NOP)\n"); 
+#endif
+}
     /* No-op */
 END_CASE(JSOP_INCELEM)
 
@@ -2139,6 +2220,11 @@ BEGIN_CASE(JSOP_INCGNAME)
 BEGIN_CASE(JSOP_DECGNAME)
 BEGIN_CASE(JSOP_GNAMEINC)
 BEGIN_CASE(JSOP_GNAMEDEC)
+{ 
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{INCPROP,DECPROP,PROPINC,PROPDEC,INCNAME,DECNAME,NAMEINC,NAMEDEC,INCGNAME,DECGNAME,GNAMEINC,GNAMEDEC} (NOP)\n"); 
+#endif
+}
     /* No-op */
 END_CASE(JSOP_INCPROP)
 
@@ -2211,6 +2297,9 @@ END_CASE(JSOP_GETPROP)
 BEGIN_CASE(JSOP_SETGNAME)
 BEGIN_CASE(JSOP_SETNAME)
 {
+#ifdef TRACEIT
+    printf("TRACE JSOP_{SETGNAME,SETNAME}\n");
+#endif
     RootedObject &scope = rootObject0;
     scope = &regs.sp[-2].toObject();
 
@@ -2240,6 +2329,9 @@ END_CASE(JSOP_SETPROP)
 BEGIN_CASE(JSOP_GETELEM)
 BEGIN_CASE(JSOP_CALLELEM)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{GETELEM,CALLELEM)\n");
+#endif
     MutableHandleValue lval = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
     HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
 
@@ -2253,6 +2345,9 @@ END_CASE(JSOP_GETELEM)
 
 BEGIN_CASE(JSOP_SETELEM)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_SETELEM\n");
+#endif
     RootedObject &obj = rootObject0;
     FETCH_OBJECT(cx, -3, obj);
     RootedId &id = rootId0;
@@ -2305,6 +2400,9 @@ BEGIN_CASE(JSOP_NEW)
 BEGIN_CASE(JSOP_CALL)
 BEGIN_CASE(JSOP_FUNCALL)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{NEW,CALL,FUNCALL}\n");
+#endif
     if (regs.fp()->hasPushedSPSFrame())
         cx->runtime->spsProfiler.updatePC(script, regs.pc);
     JS_ASSERT(regs.stackDepth() >= 2 + GET_ARGC(regs.pc));
@@ -2402,6 +2500,14 @@ BEGIN_CASE(JSOP_CALLGNAME)
 BEGIN_CASE(JSOP_NAME)
 BEGIN_CASE(JSOP_CALLNAME)
 {
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{GETGNAME,CALLGNAME,NAME,CALLNAME}\n");
+#endif
+    /* CAL
+	for (std::map<jsbytecode*, int>::iterator it = visited_pc.begin(); it != visited_pc.end(); it++){
+        printf("PC: %u\tCount: %d\n", it->first, it->second);
+    }
+    */
     RootedValue &rval = rootValue0;
 
     if (!NameOperation(cx, script, regs.pc, rval.address()))
@@ -2426,6 +2532,9 @@ BEGIN_CASE(JSOP_CALLINTRINSIC)
 END_CASE(JSOP_INTRINSICNAME)
 
 BEGIN_CASE(JSOP_UINT16)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_UINT16\n");
+#endif
     PUSH_INT32((int32_t) GET_UINT16(regs.pc));
 END_CASE(JSOP_UINT16)
 
@@ -2450,6 +2559,9 @@ BEGIN_CASE(JSOP_DOUBLE)
 END_CASE(JSOP_DOUBLE)
 
 BEGIN_CASE(JSOP_STRING)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_STRING\n");
+#endif
     PUSH_STRING(script->getAtom(regs.pc));
 END_CASE(JSOP_STRING)
 
@@ -2475,10 +2587,16 @@ BEGIN_CASE(JSOP_REGEXP)
 END_CASE(JSOP_REGEXP)
 
 BEGIN_CASE(JSOP_ZERO)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_ZERO\n");
+#endif
     PUSH_INT32(0);
 END_CASE(JSOP_ZERO)
 
 BEGIN_CASE(JSOP_ONE)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_ONE\n");
+#endif
     PUSH_INT32(1);
 END_CASE(JSOP_ONE)
 
@@ -2693,7 +2811,11 @@ END_CASE(JSOP_SETLOCAL)
 BEGIN_CASE(JSOP_DEFCONST)
 BEGIN_CASE(JSOP_DEFVAR)
 {
-    /* ES5 10.5 step 8 (with subsequent errata). */
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{DEFCONST, DEFVAR}\n");
+#endif
+    /* CAL Define new variable */
+	/* ES5 10.5 step 8 (with subsequent errata). */
     unsigned attrs = JSPROP_ENUMERATE;
     if (!regs.fp()->isEvalFrame())
         attrs |= JSPROP_PERMANENT;
@@ -3803,5 +3925,14 @@ END_CASE(JSOP_ARRAYPUSH)
     regs.fp()->setFinishedInInterpreter();
 
     gc::MaybeVerifyBarriers(cx, true);
+
+    /* CAL End of interpreter */
+    /*
+    std::map<jsbytecode*, int>::iterator vpciter;
+    for (vpciter = visited_pc.begin(); vpciter != visited_pc.end(); vpciter++){
+        printf("PC: %u\tCount: %d\n", vpciter->first, vpciter->second);
+    }
+    */
+
     return interpReturnOK;
 }
