@@ -1,3 +1,7 @@
 ../configure --disable-methodjit --disable-monoic --disable-optimize --disable-tests
 
 JS_THREADSAFE is not set.
+
+Script stored in class jsscript.h -> JSScript
+    * Contains type Bindings to hold bindings
+    * notes() of type jssrcnote*

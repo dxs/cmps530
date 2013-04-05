@@ -16,9 +16,12 @@
 #include <iostream>
 
 /* Manual tracing using individual printfs */
-#define TRACEIT 1
+//#define TRACEIT 1
 /* Trace using the single printf on BEGIN_CASE*/ 
 //#define TRACEAUTO 1
+/* Trace the PC as it executes */
+#define TRACKPC 1
+
 
 
 #include <stdio.h>
@@ -59,6 +62,7 @@ printf("DANGER: JS_METHODJIT ENABLED!!!\n");
 #include "methodjit/Logging.h"
 #endif
 
+/*
 #ifdef JS_DEBUG
 	printf("JS_DEBUG ENABLED\n");
 #endif
@@ -70,6 +74,7 @@ printf("DANGER: JS_METHODJIT ENABLED!!!\n");
 #ifdef JS_METHODJIT_SPEW
 	printf("DANGER: JS_METHODJIT_SPEW ENABLED!!!\n");
 #endif
+*/
 
 #include "jsatominlines.h"
 #include "jsinferinlines.h"
@@ -1074,7 +1079,7 @@ JS_NEVER_INLINE bool
 js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 {
     // CAL
-    int offset;
+    int track_pc;
     std::map<jsbytecode*, int> visited_pc;
 
 
@@ -1151,6 +1156,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 #define BRANCH(n)                                                             \
     JS_BEGIN_MACRO                                                            \
         regs.pc += (n);                                                       \
+        track_pc = regs.pc - original_pc;                                     \
         op = (JSOp) *regs.pc;                                                 \
         if ((n) <= 0)                                                         \
             goto check_backedge;                                              \
@@ -1297,16 +1303,14 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
         } else {
             visited_pc[regs.pc] = 1;
         }
-        offset = regs.pc - original_pc ;
+        track_pc = regs.pc - original_pc ;
         op = (JSOp) *regs.pc; // Get the opcode
 
         /* CAL Keep track of visited pc's */
-        //printf("PC: %u\nOffset: %d\n", regs.pc, offset);
-        //printf("%d\n", offset);
-        //printf("%u\n", regs.pc);
-        //printf("%p\n", regs.pc);
-
       do_op:
+#ifdef TRACKPC
+        printf("PC:\t%d\n", track_pc);
+#endif
         CHECK_PCCOUNT_INTERRUPTS();
         switchOp = int(op) | switchMask; // ??
       do_switch:
@@ -1417,10 +1421,21 @@ ADD_EMPTY_CASE(JSOP_TRY)
 ADD_EMPTY_CASE(JSOP_STARTXML)
 ADD_EMPTY_CASE(JSOP_STARTXMLEXPR)
 #endif
-ADD_EMPTY_CASE(JSOP_LOOPHEAD)
-ADD_EMPTY_CASE(JSOP_LOOPENTRY)
+//ADD_EMPTY_CASE(JSOP_LOOPHEAD)
+//ADD_EMPTY_CASE(JSOP_LOOPENTRY)
 #ifdef TRACEIT
 printf("TRACE: EMPTY\n");
+#endif
+END_EMPTY_CASES
+
+BEGIN_CASE(JSOP_LOOPHEAD)
+#ifdef TRACEIT
+printf("TRACE: JSOP_LOOPHEAD\n");
+#endif
+END_EMPTY_CASES
+BEGIN_CASE(JSOP_LOOPENTRY)
+#ifdef TRACEIT
+printf("TRACE: JSOP_LOOPENTRY\n");
 #endif
 END_EMPTY_CASES
 
@@ -1628,6 +1643,10 @@ END_CASE(JSOP_AND)
             regs.sp -= spdec;                                                 \
             if (cond == (diff_ != 0)) {                                       \
                 ++regs.pc;                                                    \
+                ++track_pc;                                                   \
+#ifdef TRACKPC                                                                \
+                printf("PC:\t%d\n", track_pc);                                \
+#def TRACKPC                                                                  \
                 len = GET_JUMP_OFFSET(regs.pc);                               \
                 BRANCH(len);                                                  \
             }                                                                 \
@@ -1705,7 +1724,7 @@ END_CASE(JSOP_ENDITER)
 BEGIN_CASE(JSOP_DUP)
 {
 #ifdef TRACEIT
-    printf("TRACE: JSOP_DUP");
+    printf("TRACE: JSOP_DUP\n");
 #endif
     JS_ASSERT(regs.stackDepth() >= 1);
     const Value &rref = regs.sp[-1];
@@ -1716,7 +1735,7 @@ END_CASE(JSOP_DUP)
 BEGIN_CASE(JSOP_DUP2)
 {
 #ifdef TRACEIT
-    printf("TRACE: JSOP_DUP2");
+    printf("TRACE: JSOP_DUP2\n");
 #endif
     JS_ASSERT(regs.stackDepth() >= 2);
     const Value &lref = regs.sp[-2];
