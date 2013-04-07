@@ -14,13 +14,14 @@
 // CAL Includes and Defines
 #include <map>
 #include <iostream>
+#include "cmps530.h"
 
 /* Manual tracing using individual printfs */
 //#define TRACEIT 1
 /* Trace using the single printf on BEGIN_CASE*/ 
 //#define TRACEAUTO 1
 /* Trace the PC as it executes */
-#define TRACKPC 1
+//#define TRACKPC 1
 
 
 
@@ -1078,8 +1079,9 @@ TypeCheckNextBytecode(JSContext *cx, JSScript *script, unsigned n, const FrameRe
 JS_NEVER_INLINE bool
 js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 {
+
     // CAL
-    int track_pc;
+    int offset;
     std::map<jsbytecode*, int> visited_pc;
 
 
@@ -1156,7 +1158,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 #define BRANCH(n)                                                             \
     JS_BEGIN_MACRO                                                            \
         regs.pc += (n);                                                       \
-        track_pc = regs.pc - original_pc;                                     \
+        offset = regs.pc - original_pc;                                     \
         op = (JSOp) *regs.pc;                                                 \
         if ((n) <= 0)                                                         \
             goto check_backedge;                                              \
@@ -1174,7 +1176,8 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
     /* Repoint cx->regs to a local variable for faster access. */
     FrameRegs regs = cx->regs();
-    // CAL
+    // CAL Store original pc physical pointer address.
+    // Allows for computing offset based (virtual address) pc.
     jsbytecode *original_pc = regs.pc;
     PreserveRegsGuard interpGuard(cx, regs);
 
@@ -1303,13 +1306,15 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
         } else {
             visited_pc[regs.pc] = 1;
         }
-        track_pc = regs.pc - original_pc ;
+        offset = regs.pc - original_pc ;
         op = (JSOp) *regs.pc; // Get the opcode
 
         /* CAL Keep track of visited pc's */
       do_op:
+        GetInstructionType(script->notes(), offset);
+
 #ifdef TRACKPC
-        printf("PC:\t%d\n", track_pc);
+        printf("PC:\t%d\n", offset);
 #endif
         CHECK_PCCOUNT_INTERRUPTS();
         switchOp = int(op) | switchMask; // ??
@@ -1635,6 +1640,7 @@ END_CASE(JSOP_AND)
             goto error;                                                       \
     JS_END_MACRO
 
+#ifdef TRACKPC                                                                
 #define TRY_BRANCH_AFTER_COND(cond,spdec)                                     \
     JS_BEGIN_MACRO                                                            \
         JS_ASSERT(js_CodeSpec[op].length == 1);                               \
@@ -1643,10 +1649,7 @@ END_CASE(JSOP_AND)
             regs.sp -= spdec;                                                 \
             if (cond == (diff_ != 0)) {                                       \
                 ++regs.pc;                                                    \
-                ++track_pc;                                                   \
-#ifdef TRACKPC                                                                \
-                printf("PC:\t%d\n", track_pc);                                \
-#def TRACKPC                                                                  \
+                ++offset;                                                   \
                 len = GET_JUMP_OFFSET(regs.pc);                               \
                 BRANCH(len);                                                  \
             }                                                                 \
@@ -1654,6 +1657,24 @@ END_CASE(JSOP_AND)
             DO_NEXT_OP(len);                                                  \
         }                                                                     \
     JS_END_MACRO
+#else
+#define TRY_BRANCH_AFTER_COND(cond,spdec)                                     \
+    JS_BEGIN_MACRO                                                            \
+        JS_ASSERT(js_CodeSpec[op].length == 1);                               \
+        unsigned diff_ = (unsigned) GET_UINT8(regs.pc) - (unsigned) JSOP_IFEQ;         \
+        if (diff_ <= 1) {                                                     \
+            regs.sp -= spdec;                                                 \
+            if (cond == (diff_ != 0)) {                                       \
+                ++regs.pc;                                                    \
+                ++offset;                                                   \
+                len = GET_JUMP_OFFSET(regs.pc);                               \
+                BRANCH(len);                                                  \
+            }                                                                 \
+            len = 1 + JSOP_IFEQ_LENGTH;                                       \
+            DO_NEXT_OP(len);                                                  \
+        }                                                                     \
+    JS_END_MACRO
+#endif 
 
 BEGIN_CASE(JSOP_IN)
 {
