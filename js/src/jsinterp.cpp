@@ -1192,6 +1192,10 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
     Rooted<JSScript*> script(cx);
     SET_SCRIPT(regs.fp()->script());
 
+    /* CAL Create script source notes */
+    ScriptNotes notes(cx, script, original_pc);
+    notes.print();
+
     /*
      * Pool of rooters for use in this interpreter frame. References to these
      * are used for local variables within interpreter cases. This avoids
@@ -1311,7 +1315,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
         /* CAL Keep track of visited pc's */
       do_op:
-        GetInstructionType(script->notes(), offset);
+        // GetInstructionType(&notes, offset);
 
 #ifdef TRACKPC
         printf("PC:\t%d\n", offset);

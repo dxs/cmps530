@@ -7129,6 +7129,7 @@ JS_FRIEND_DATA(JSSrcNoteSpec) js_SrcNoteSpec[] = {
     {"newline",         0},
     {"setline",         1},
     {"xdelta",          0},
+    {"middle", 			0},
 };
 
 JS_FRIEND_API(unsigned)

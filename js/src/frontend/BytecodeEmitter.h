@@ -316,7 +316,8 @@ enum SrcNoteType {
     SRC_COLSPAN     = 21,       /* number of columns this opcode spans */
     SRC_NEWLINE     = 22,       /* bytecode follows a source newline */
     SRC_SETLINE     = 23,       /* a file-absolute source line number note */
-    SRC_XDELTA      = 24        /* 24-31 are for extended delta notes */
+    SRC_XDELTA      = 24,       /* 24-31 are for extended delta notes */
+    SRC_MIDDLE 		= 25		/* Middle of an instruction */
 };
 
 /*

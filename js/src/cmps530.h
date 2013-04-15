@@ -2,10 +2,12 @@
 
 #include "jsprvtd.h"
 #include "jsscript.h"
+#include <map>
 // For SrcNoteType
 #include "frontend/BytecodeEmitter.h"
 
 using namespace js;
+
 
 typedef enum LoopType {
     JSLOOP_FOR,
@@ -14,73 +16,59 @@ typedef enum LoopType {
 } LoopType;
 
 struct Loop {
+    LoopType looptype;
     jsbytecode *loophead;   // Loop body head
-    jsbytecode *loopentry;  // condition check, update already done 
+    jsbytecode *loopentry;  // condition check (cond), update already done 
     jsbytecode *update;     // condition update.
                                 // for loop only
                                 // while loop: unknown
                                 // for-in loop: nextiter immediately after loophead
-    LoopType looptype;
+    jsbytecode *tail;
 };
 
-char *SrcNoteTypeNames[] {
-    (char *)"SRC_NULL",        
-    (char *)"SRC_IF,BREAK,INITPROP",        
-    (char *)"SRC_GENEXP",        
-    (char *)"SRC_IF_ELSE,FOR_IN",        
-    (char *)"SRC_FOR",        
-    (char *)"SRC_WHILE",        
-    (char *)"SRC_CONTINUE",        
-    (char *)"SRC_DECL,DESTRUCT",        
-    (char *)"SRC_PCDELTA,GROUPASSIGN,DESTRUCTLET",        
-    (char *)"SRC_ASSIGNOP",        
-    (char *)"SRC_COND",        
-    (char *)"SRC_BRACE",       
-    (char *)"SRC_HIDDEN",       
-    (char *)"SRC_PCBASE",       
-    (char *)"SRC_LABEL",       
-    (char *)"SRC_LABELBRACE",       
-    (char *)"SRC_ENDBRACE",       
-    (char *)"SRC_BREAK2LABEL",       
-    (char *)"SRC_CONT2LABEL",       
-    (char *)"SRC_SWITCH",       
-    (char *)"SRC_SWITCHBREAK",       
-    (char *)"SRC_FUNCDEF",       
-    (char *)"SRC_CATCH",       
-    (char *)"SRC_COLSPAN",       
-    (char *)"SRC_NEWLINE",       
-    (char *)"SRC_SETLINE",       
-    (char *)"SRC_XDELTA"
+struct Instruction {
+    unsigned ofs;
+    unsigned line;
+    unsigned pc;
+    unsigned delta;
+    SrcNoteType type;
+    Loop loopdata; // If type is loop
+
+    Instruction(unsigned p_ofs, unsigned p_line, unsigned p_pc, unsigned p_delta, 
+                SrcNoteType p_type) : ofs(p_ofs), line(p_line), pc(p_pc), delta(p_delta),
+                type(p_type) {}
 };
 
-SrcNoteType GetInstructionType(jssrcnote *note, int offset) {
+typedef std::map<unsigned, Instruction*> instr_map;
+typedef std::map<unsigned, Instruction*>::iterator instr_map_iter;
 
-    SrcNoteType sn_type = (SrcNoteType) SN_TYPE(note + offset);
-    //std::cout << "PC: " << offset << " NoteType: " << SrcNoteTypeNames[sn_type] << "\n";
-    std::cout << "PC: " << offset << " NoteType: " << js_SrcNoteSpec[sn_type].name << "\n";
-
-    return sn_type;
-} 
-
-class Notes {
+class ScriptNotes {
     JSContext *cx;
     JSScript *script;
-    //Vector<int> list;
-
+    jsbytecode *original_pc;
+    instr_map instruction_notes; // The disassembled notes
+    //Intruction * instr;
+                                                       // Indexed by pc
   public:
-    Notes(JSContext *c, JSScript *s) : cx(c), script(s)
+    ScriptNotes(JSContext *c, JSScript *s, jsbytecode *p) : cx(c), script(s), original_pc(p)
     {
         //"ofs", "line", "pc", "delta", "desc", "args");
+        // offset variable == pc.  
+        // beginning pointer - Current pointer == offset printout
+        //        (sn)             (notes)
         unsigned offset = 0;
         unsigned colspan = 0;
         unsigned lineno = script->lineno;
         jssrcnote *notes = script->notes();
         unsigned switchTableEnd = 0, switchTableStart = 0;
+        // Main decoding loop.  Each iteration corresponds to decoding a 
+        // single note.
         for (jssrcnote *sn = notes; !SN_IS_TERMINATOR(sn); sn = SN_NEXT(sn)) {
             unsigned delta = SN_DELTA(sn);
             offset += delta;
             SrcNoteType type = (SrcNoteType) SN_TYPE(sn);
             const char *name = js_SrcNoteSpec[type].name;
+            Instruction *instr;
             if (type == SRC_LABEL) {
                 /* Check if the source note is for a switch case. */
                 if (switchTableStart <= offset && offset < switchTableEnd)
@@ -102,6 +90,15 @@ class Notes {
                 ++lineno;
                 break;
               case SRC_FOR:
+                instr = new Instruction( unsigned(sn - notes), lineno, offset, delta, type);
+                Loop thisloop;
+                thisloop.looptype = JSLOOP_FOR;
+                thisloop.loophead = original_pc + offset + 6;
+                thisloop.loopentry = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn,0)) + 1; //cond + 1
+                thisloop.update = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 1));
+                thisloop.tail = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 2));
+                instr->loopdata = thisloop;
+                this->instruction_notes[offset] = instr;
                 //Sprint(sp, " cond %u update %u tail %u",
                        //unsigned(js_GetSrcNoteOffset(sn, 0)),
                        //unsigned(js_GetSrcNoteOffset(sn, 1)),
@@ -169,6 +166,30 @@ class Notes {
               default:;
             }
             //Sprint(sp, "\n");
+        }
+    }
+
+    /* Return an iterator to the instruction at the pc */
+    Instruction * getInstruction(unsigned pc) {
+        if (instruction_notes.count(pc)) {
+            return instruction_notes[pc];
+        } else {
+            return NULL;
+        }
+    }
+    
+    void print() {
+        for (instr_map_iter it = instruction_notes.begin(); it != instruction_notes.end(); ++it){
+            printf("%3u: %4u %5u [%4u] %-8s", it->second->ofs, it->second->line, 
+                                                it->second->pc, it->second->delta, 
+                                                js_SrcNoteSpec[it->second->type].name);
+            if (it->second->type == SRC_FOR) {
+                printf(" head %d entry/cond %d update %d tail %d\n",
+                        int( it->second->loopdata.loophead - original_pc),
+                        int( it->second->loopdata.loopentry - original_pc),
+                        int( it->second->loopdata.update - original_pc),
+                        int( it->second->loopdata.tail - original_pc));
+            } else { printf("\n"); }
         }
     }
 };
