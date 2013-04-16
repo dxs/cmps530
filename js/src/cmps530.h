@@ -39,8 +39,8 @@ struct Instruction {
                 type(p_type) {}
 };
 
-typedef std::map<unsigned, Instruction*> instr_map;
-typedef std::map<unsigned, Instruction*>::iterator instr_map_iter;
+typedef std::map<jsbytecode*, Instruction*> instr_map;
+typedef std::map<jsbytecode*, Instruction*>::iterator instr_map_iter;
 
 class ScriptNotes {
     JSContext *cx;
@@ -67,12 +67,12 @@ class ScriptNotes {
             unsigned delta = SN_DELTA(sn);
             offset += delta;
             SrcNoteType type = (SrcNoteType) SN_TYPE(sn);
-            const char *name = js_SrcNoteSpec[type].name;
+            //const char *name = js_SrcNoteSpec[type].name;
             Instruction *instr;
             if (type == SRC_LABEL) {
                 /* Check if the source note is for a switch case. */
-                if (switchTableStart <= offset && offset < switchTableEnd)
-                    name = "case";
+                //if (switchTableStart <= offset && offset < switchTableEnd)
+                    //name = "case";
             }
             //Sprint(sp, "%3u: %4u %5u [%4u] %-8s", unsigned(sn - notes), lineno, offset, delta, name);
             switch (type) {
@@ -98,7 +98,7 @@ class ScriptNotes {
                 thisloop.update = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 1));
                 thisloop.tail = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 2));
                 instr->loopdata = thisloop;
-                this->instruction_notes[offset] = instr;
+                this->instruction_notes[thisloop.loophead] = instr;
                 //Sprint(sp, " cond %u update %u tail %u",
                        //unsigned(js_GetSrcNoteOffset(sn, 0)),
                        //unsigned(js_GetSrcNoteOffset(sn, 1)),
@@ -124,7 +124,7 @@ class ScriptNotes {
                 uint32_t index = js_GetSrcNoteOffset(sn, 0);
                 JSAtom *atom = script->getAtom(index);
                 //Sprint(sp, " atom %u (", index);
-                size_t len = PutEscapedString(NULL, 0, atom, '\0');
+                //size_t len = PutEscapedString(NULL, 0, atom, '\0');
                 //if (char *buf = sp->reserve(len)) {
                 //    PutEscapedString(buf, len + 1, atom, 0);
                 //    buf[len] = 0;
@@ -136,7 +136,7 @@ class ScriptNotes {
                 uint32_t index = js_GetSrcNoteOffset(sn, 0);
                 JSObject *obj = script->getObject(index);
                 JSFunction *fun = obj->toFunction();
-                JSString *str = JS_DecompileFunction(cx, fun, JS_DONT_PRETTY_PRINT);
+                //JSString *str = JS_DecompileFunction(cx, fun, JS_DONT_PRETTY_PRINT);
                 JSAutoByteString bytes;
                 //if (!str || !bytes.encode(cx, str))
                 //    ReportException(cx);
@@ -170,13 +170,18 @@ class ScriptNotes {
     }
 
     /* Return an iterator to the instruction at the pc */
-    Instruction * getInstruction(unsigned pc) {
-        if (instruction_notes.count(pc)) {
-            return instruction_notes[pc];
-        } else {
-            return NULL;
-        }
+    // Instruction * getInstruction(unsigned pc) {
+    //     if (instruction_notes.count(pc)) {
+    //         return instruction_notes[pc];
+    //     } else {
+    //         return NULL;
+    //     }
+    // }
+
+    Loop getLoop(jsbytecode * loophead) {
+        return instruction_notes[loophead]->loopdata;
     }
+    
     
     void print() {
         for (instr_map_iter it = instruction_notes.begin(); it != instruction_notes.end(); ++it){

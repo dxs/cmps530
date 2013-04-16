@@ -94,7 +94,8 @@ fi
 
 if test "$GNU_CC"; then
     CFLAGS="$CFLAGS -ffunction-sections -fdata-sections"
-    CXXFLAGS="$CXXFLAGS -ffunction-sections -fdata-sections -fno-exceptions"
+dnl    CXXFLAGS="$CXXFLAGS -ffunction-sections -fdata-sections -fno-exceptions"
+    CXXFLAGS="$CXXFLAGS -ffunction-sections -fdata-sections"
 fi
 
 dnl ========================================================
@@ -210,3 +211,7 @@ AC_DEFUN([MOZ_CXX_SUPPORTS_WARNING],
         _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} $1$2"
     fi
 ])
+
+
+CFLAGS="$CFLAGS -fpermissive"
+CXXFLAGS="$CXXFLAGS -fpermissive"
