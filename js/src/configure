@@ -44,7 +44,7 @@
 
 
 CFLAGS="$CFLAGS -fpermissive"
-CXXFLAGS="$CXXFLAGS -fpermissive"
+CXXFLAGS="$CXXFLAGS -fpermissive -std=c++0x"
 
 
 
@@ -11047,7 +11047,7 @@ EOF
 			fi
 			;;
 	esac
-    LDFLAGS="${_PTHREAD_LDFLAGS} ${LDFLAGS} -lboost_thread-mt -lboost_system"
+    LDFLAGS="${_PTHREAD_LDFLAGS} ${LDFLAGS}"
 fi
 
 
