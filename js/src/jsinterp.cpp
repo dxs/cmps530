@@ -14,6 +14,7 @@
 // CAL Includes and Defines
 #include <map>
 #include <iostream>
+#include <thread>
 #include "cmps530.h"
 
 /* Manual tracing using individual printfs */
@@ -24,6 +25,7 @@
 //#define TRACKPC 1
 /* Run loops in parallel */
 #define LOOP_PARALLEL 1
+
 
 
 
@@ -104,9 +106,6 @@ printf("DANGER: JS_METHODJIT ENABLED!!!\n");
 printf("DANGER: JS_MONOIC ENABLED!!!\n");
 #include "methodjit/MonoIC.h"
 #endif
-
-// CAL Include boost
-#include <boost/thread.hpp>
 
 using namespace js;
 using namespace js::gc;
@@ -1082,6 +1081,8 @@ TypeCheckNextBytecode(JSContext *cx, JSScript *script, unsigned n, const FrameRe
 }
 
 #include "cmps530-threading.cpp"
+#undef dout
+#define dout 0 && cout
 
 JS_NEVER_INLINE bool
 js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
@@ -1090,9 +1091,9 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 #include "interp-defines.h"
 
     // CAL
+    int counter = 1;  // Hack until I figure out how to retrieve js variable values
     int offset;
     std::map<jsbytecode*, int> visited_pc;
-    bool * threadOK = 0;
     Loop loopdata;
 
     JSAutoResolveFlags rf(cx, RESOLVE_INFER);
@@ -3871,15 +3872,18 @@ END_CASE(JSOP_ARRAYPUSH)
     return interpReturnOK;
   
   thread_loop:
-    std::cout << "PC: " << regs.pc << "\n";
-    *threadOK = true;
+    //std::cout << "PC: " << regs.pc << "\n";
+
     loopdata = notes.getLoop(regs.pc);
-    pthread_t mythread;
-    pthread_create(&mythread, NULL, hello, NULL);
-    //boost::thread hello();
-    //boost::thread loopy(ThreadInterpret, cx, entryFrame, interpMode, original_pc, script, loopdata.update, threadOK);
+    
+    dout << "Creating thread " << counter << endl;
+    std::thread mythread(ThreadInterpret, counter, cx, regs, offset, original_pc, loopdata.update);
+    mythread.join();
+    dout << "Thread " << counter << " finished." << endl;
+    counter++;
     len = 0;
+    regs.pc = loopdata.update;
     DO_NEXT_OP(len);
-    //goto advance_pc_by_one;
+    // goto advance_pc_by_one;
 }
 

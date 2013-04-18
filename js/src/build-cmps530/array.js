@@ -1,7 +1,6 @@
-var myarray = new Array();
+var i,j=10
 
-for (var i = 0; i<100; i++) {
-    myarray[i] = i;
+for (i=0; i<10; i++){
+    j = i+1;
 }
 
-print("Booya!");
