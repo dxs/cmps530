@@ -2791,7 +2791,7 @@ then
 			fi
 			;;
 	esac
-    LDFLAGS="${_PTHREAD_LDFLAGS} ${LDFLAGS}"
+    LDFLAGS="${_PTHREAD_LDFLAGS} ${LDFLAGS} -lboost_thread-mt -lboost_system"
 fi
 
 

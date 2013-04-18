@@ -349,7 +349,7 @@ class Rooted : public RootedBase<T>
         return ptr;
     }
 
-  private:
+  //private:
 
 #if defined(JSGC_ROOT_ANALYSIS) || defined(JSGC_USE_EXACT_ROOTING)
     Rooted<T> **stack, *prev;

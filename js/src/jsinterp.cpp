@@ -108,7 +108,6 @@ printf("DANGER: JS_MONOIC ENABLED!!!\n");
 // CAL Include boost
 #include <boost/thread.hpp>
 
-
 using namespace js;
 using namespace js::gc;
 using namespace js::types;
@@ -3875,8 +3874,12 @@ END_CASE(JSOP_ARRAYPUSH)
     std::cout << "PC: " << regs.pc << "\n";
     *threadOK = true;
     loopdata = notes.getLoop(regs.pc);
-    boost::thread loopy(ThreadInterpret, cx, entryFrame, interpMode, original_pc, script, loopdata.update, threadOK);
+    pthread_t mythread;
+    pthread_create(&mythread, NULL, hello, NULL);
+    //boost::thread hello();
+    //boost::thread loopy(ThreadInterpret, cx, entryFrame, interpMode, original_pc, script, loopdata.update, threadOK);
     len = 0;
-    DO_NEXT_OP(len)
+    DO_NEXT_OP(len);
+    //goto advance_pc_by_one;
 }
 

@@ -1,6 +1,13 @@
 #include <iostream>
+#include <pthread.h>
 
 using namespace std;
+
+extern "C" void * hello()  
+{  
+    std::cout <<  "Hello world, I'm thread"  << "!\n";  
+    pthread_exit(0);
+}
 
 JS_NEVER_INLINE void
 ThreadInterpret(JSContext *old_cx, StackFrame *entryFrame, InterpMode interpMode, jsbytecode *original_pc, Rooted<JSScript*> script, jsbytecode * stop_pc, bool * threadOK)
