@@ -3877,7 +3877,7 @@ END_CASE(JSOP_ARRAYPUSH)
     loopdata = notes.getLoop(regs.pc);
     
     dout << "Creating thread " << counter << endl;
-    std::thread mythread(ThreadInterpret, counter, cx, regs, offset, original_pc, loopdata.update);
+    std::thread mythread(ThreadInterpret, counter, cx, &regs, offset, original_pc, loopdata.update);
     mythread.join();
     dout << "Thread " << counter << " finished." << endl;
     counter++;

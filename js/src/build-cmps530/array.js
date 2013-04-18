@@ -1,6 +1,8 @@
-var i,j=10
+var myarray = new Array()
 
-for (i=0; i<10; i++){
-    j = i+1;
+for (i=0; i<15; ++i){
+    myarray[i] = i;
 }
+
+print(myarray);
 
