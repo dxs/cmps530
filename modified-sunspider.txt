@@ -1,0 +1,3 @@
+3d-cube.js:
+    Converted the final for loop into a while loop.  The loop contains a 
+function call.

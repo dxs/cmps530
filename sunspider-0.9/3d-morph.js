@@ -44,8 +44,10 @@ var a = Array()
 for (var i=0; i < nx*nz*3; ++i) 
     a[i] = 0
 
-for (var i = 0; i < loops; ++i) {
-    morph(a, i/loops)
+var i = 0;
+while (i < loops) {
+    morph(a, i/loops);
+    i++;
 }
 
 testOutput = 0;

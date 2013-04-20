@@ -1,0 +1,3 @@
+3d-cude.js:
+    Problem is that all the for loops are within functions.  My system 
+currently only handles for loops on the global scale
