@@ -1,21 +1,37 @@
 #include <iostream>
 #include <thread>
 
-#define DEBUG
+#define DOUT
 
-#ifdef DEBUG
+#ifdef DOUT 
 #define dout cout << __FILE__ << "(" << __LINE__ << ") DEBUG: "
 #else
-#define dout 0 && cout
+#define dout 0 && std::cout
 #endif /* DEBUG */
 
 using namespace std;
 
+#define PUSH_COPY(v)             do { *regs.sp++ = v; assertSameCompartment(cx, regs.sp[-1]); } while (0)
+#define PUSH_COPY_SKIP_CHECK(v)  *regs.sp++ = v
+#define PUSH_NULL()              regs.sp++->setNull()
+#define PUSH_UNDEFINED()         regs.sp++->setUndefined()
+#define PUSH_BOOLEAN(b)          regs.sp++->setBoolean(b)
+#define PUSH_DOUBLE(d)           regs.sp++->setDouble(d)
+#define PUSH_INT32(i)            regs.sp++->setInt32(i)
+#define PUSH_STRING(s)           do { regs.sp++->setString(s); assertSameCompartment(cx, regs.sp[-1]); } while (0)
+#define PUSH_OBJECT(obj)         do { regs.sp++->setObject(obj); assertSameCompartment(cx, regs.sp[-1]); } while (0)
+#define PUSH_OBJECT_OR_NULL(obj) do { regs.sp++->setObjectOrNull(obj); assertSameCompartment(cx, regs.sp[-1]); } while (0)
+#define PUSH_HOLE()              regs.sp++->setMagic(JS_ARRAY_HOLE)
+#define POP_COPY_TO(v)           v = *--regs.sp
+#define POP_RETURN_VALUE()       regs.fp()->setReturnValue(*--regs.sp)
+
 JS_NEVER_INLINE void
-ThreadInterpret(int id, JSContext *cx, FrameRegs *orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc)
+ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, RootedValue *rootValue0, RootedValue *rootValue1,
+    RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0)
 {
     FrameRegs regs = *orig_regs;
-    std::dout << "Thread " << id << ", PC: " << regs.pc - original_pc << ", Stop: " << stop_pc - original_pc << endl;
+    regs.pc = start_pc;
+    dout << "Thread " << id << ", PC: " << regs.pc - original_pc << ", Stop: " << stop_pc - original_pc << endl;
 #include "interp-defines.h"
     /*
      * It is important that "op" be initialized before calling DO_OP because
@@ -27,10 +43,6 @@ ThreadInterpret(int id, JSContext *cx, FrameRegs *orig_regs, int offset, jsbytec
     int32_t len=0;
     int switchOp;
     register int switchMask = 0;
-
-    RootedValue rootValue0(cx), rootValue1(cx);
-    RootedObject rootObject0(cx), rootObject1(cx), rootObject2(cx);
-    RootedId rootId0(cx);
 
     DO_NEXT_OP(len);
 
@@ -58,11 +70,11 @@ ThreadInterpret(int id, JSContext *cx, FrameRegs *orig_regs, int offset, jsbytec
         regs.pc += len; // Set pc (len set by last op to execute)
         offset = regs.pc - original_pc ;
         op = (JSOp) *(regs.pc); // Get the opcode
-        std::dout << "PC:" << offset << " Opcode: " << op << std::endl;
+        dout << "PC:" << offset << " Opcode: " << op << std::endl;
 
       do_op:
         if (regs.pc == stop_pc) {
-            (*orig_regs) = regs;
+            //(*orig_regs) = regs;
             return;
         }
 
@@ -141,7 +153,7 @@ BEGIN_CASE(JSOP_CALLNAME)
         printf("PC: %u\tCount: %d\n", it->first, it->second);
     }
     */
-    RootedValue &rval = rootValue0;
+    RootedValue &rval = *rootValue0;
 
     // if (!NameOperation(cx, script, regs.pc, rval.address()))
     //     goto error;
@@ -177,7 +189,7 @@ BEGIN_CASE(JSOP_SETNAME)
 #ifdef TRACEIT
     printf("TRACE JSOP_{SETGNAME,SETNAME}\n");
 #endif
-    RootedObject &scope = rootObject0;
+    RootedObject &scope = *rootObject0;
     scope = &regs.sp[-2].toObject();
 
     HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
@@ -202,7 +214,7 @@ BEGIN_CASE(JSOP_SETELEM)
 #ifdef TRACEIT
     printf("TRACE: JSOP_SETELEM\n");
 #endif
-    RootedObject &obj = rootObject0;
+    RootedObject &obj = *rootObject0;
     // FETCH_OBJECT(cx, -3, obj);
     // vvvvv
     HandleValue val = HandleValue::fromMarkedLocation(&regs.sp[-3]);
@@ -212,7 +224,7 @@ BEGIN_CASE(JSOP_SETELEM)
         goto error;
     }
     // ^^^^^
-    RootedId &id = rootId0;
+    RootedId &id = *rootId0;
     // FETCH_ELEMENT_ID(obj, -2, id);
     // vvvvvv
     const Value &idval_ = regs.sp[-2];                                     
@@ -233,11 +245,78 @@ BEGIN_CASE(JSOP_NEW)
 BEGIN_CASE(JSOP_CALL)
 BEGIN_CASE(JSOP_FUNCALL)
 {
-    std::cout << "Functions not supported in loop. Opcode: " << op << std::endl;
+    std::cout << "Functions not supported in loop. " << std::endl << "Opcode: " << op  << " PC: " << regs.pc - original_pc << std::endl;
     goto error;
 }
 END_CASE(JSOP_NEW)
     
+BEGIN_CASE(JSOP_ZERO)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_ZERO\n");
+#endif
+    PUSH_INT32(0);
+END_CASE(JSOP_ZERO)
+
+BEGIN_CASE(JSOP_DIV)
+{
+    RootedValue &lval = *rootValue0; 
+    RootedValue &rval = *rootValue1;
+    lval = regs.sp[-2];
+    rval = regs.sp[-1];
+    if (!DivOperation(cx, lval, rval, &regs.sp[-2]))
+        goto error;
+    regs.sp--;
+}
+END_CASE(JSOP_DIV)
+
+BEGIN_CASE(JSOP_INT8)
+    PUSH_INT32(GET_INT8(regs.pc));
+END_CASE(JSOP_INT8)
+
+BEGIN_CASE(JSOP_MUL)
+{
+    RootedValue &lval = *rootValue0, &rval = *rootValue1;
+    lval = regs.sp[-2];
+    rval = regs.sp[-1];
+    if (!MulOperation(cx, lval, rval, &regs.sp[-2]))
+        goto error;
+    regs.sp--;
+}
+END_CASE(JSOP_MUL)
+
+BEGIN_CASE(JSOP_GETELEM)
+BEGIN_CASE(JSOP_CALLELEM)
+{
+    std::cout << "JSOP_GETELEM AND JSOP_CALLELEM currently giving problems\n";
+    goto error;
+#ifdef TRACEIT
+    printf("TRACE: JSOP_{GETELEM,CALLELEM)\n");
+#endif
+    MutableHandleValue lval = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
+    HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
+
+    MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
+    bool result = GetElementOperation(cx, op, lval, rval, res);
+    if (!result)
+        std::cout << "Thread failed to GET or CALL ELEM. PC: " << offset << std::endl;
+        goto error;
+    // TypeScript::Monitor(cx, script, regs.pc, res);
+    regs.sp--;
+}
+END_CASE(JSOP_GETELEM)
+
+
+BEGIN_CASE(JSOP_DUP)
+{
+#ifdef TRACEIT
+    printf("TRACE: JSOP_DUP\n");
+#endif
+    //JS_ASSERT(regs.stackDepth() >= 1);
+    const Value &rref = regs.sp[-1];
+    PUSH_COPY(rref);
+}
+END_CASE(JSOP_DUP)
+
 default:
 {
   std::cout << "Unimplemented opcode: " << op << std::endl;

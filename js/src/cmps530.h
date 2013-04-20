@@ -24,6 +24,7 @@ struct Loop {
                                 // while loop: unknown
                                 // for-in loop: nextiter immediately after loophead
     jsbytecode *tail;
+    int exit;
 };
 
 struct Instruction {
@@ -97,6 +98,7 @@ class ScriptNotes {
                 thisloop.loopentry = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn,0)) + 1; //cond + 1
                 thisloop.update = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 1));
                 thisloop.tail = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 2));
+                thisloop.exit = thisloop.tail - original_pc + 6;
                 instr->loopdata = thisloop;
                 this->instruction_notes[thisloop.loophead] = instr;
                 //Sprint(sp, " cond %u update %u tail %u",
@@ -180,6 +182,10 @@ class ScriptNotes {
 
     Loop getLoop(jsbytecode * loophead) {
         return instruction_notes[loophead]->loopdata;
+    }
+
+    bool loopExists(jsbytecode * loophead) {
+        return (instruction_notes.count(loophead)) ? true:false;
     }
     
     

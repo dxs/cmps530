@@ -15,6 +15,7 @@
 #include <map>
 #include <iostream>
 #include <thread>
+#include <queue>
 #include "cmps530.h"
 
 /* Manual tracing using individual printfs */
@@ -66,20 +67,6 @@ printf("DANGER: JS_METHODJIT ENABLED!!!\n");
 #include "methodjit/MethodJIT.h"
 #include "methodjit/Logging.h"
 #endif
-
-/*
-#ifdef JS_DEBUG
-	printf("JS_DEBUG ENABLED\n");
-#endif
-
-#ifdef DEBUG
-	printf("DEBUG ENABLED\n");
-#endif
-
-#ifdef JS_METHODJIT_SPEW
-	printf("DANGER: JS_METHODJIT_SPEW ENABLED!!!\n");
-#endif
-*/
 
 #include "jsatominlines.h"
 #include "jsinferinlines.h"
@@ -1081,8 +1068,17 @@ TypeCheckNextBytecode(JSContext *cx, JSScript *script, unsigned n, const FrameRe
 }
 
 #include "cmps530-threading.cpp"
+
+#undef DOUT
 #undef dout
-#define dout 0 && cout
+
+//#define DOUT
+
+#ifdef DOUT 
+#define dout cout << __FILE__ << "(" << __LINE__ << ") DEBUG: "
+#else
+#define dout 0 && std::cout
+#endif /* DEBUG */
 
 JS_NEVER_INLINE bool
 js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
@@ -1095,6 +1091,9 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
     int offset;
     std::map<jsbytecode*, int> visited_pc;
     Loop loopdata;
+    jsbytecode* current_loop = NULL;
+    std::queue<std::thread> loop_threads;
+    bool inloop = false;
 
     JSAutoResolveFlags rf(cx, RESOLVE_INFER);
 
@@ -1128,7 +1127,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
     /* CAL Create script source notes */
     ScriptNotes notes(cx, script, original_pc);
-    notes.print();
+    // notes.print();
 
     /*
      * Pool of rooters for use in this interpreter frame. References to these
@@ -1249,7 +1248,17 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
         /* CAL Keep track of visited pc's */
       do_op:
+        //std::cout << "PC:" << offset << " Opcode: " << op << std::endl;
         // GetInstructionType(&notes, offset);
+        if (inloop && offset == loopdata.exit ){
+            std::cout << "\nExiting loop\n";
+            inloop = false;
+            while (!loop_threads.empty()){
+            	std::cout << "\nWaiting on thread\n";
+                loop_threads.front().join();
+                loop_threads.pop();
+            }
+        }
 
 #ifdef TRACKPC
         printf("PC:\t%d\n", offset);
@@ -2271,7 +2280,8 @@ BEGIN_CASE(JSOP_CALLELEM)
     HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
 
     MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
-    if (!GetElementOperation(cx, op, lval, rval, res))
+    bool result = GetElementOperation(cx, op, lval, rval, res);
+    if (!result)
         goto error;
     TypeScript::Monitor(cx, script, regs.pc, res);
     regs.sp--;
@@ -2284,7 +2294,14 @@ BEGIN_CASE(JSOP_SETELEM)
     printf("TRACE: JSOP_SETELEM\n");
 #endif
     RootedObject &obj = rootObject0;
-    FETCH_OBJECT(cx, -3, obj);
+//    FETCH_OBJECT(cx, -3, obj);
+    HandleValue val = HandleValue::fromMarkedLocation(&regs.sp[-3]);
+    obj = ToObject(cx, (val));
+    if (!obj) {
+        cout << "Failed ToObject\n";
+        goto error;
+    }
+
     RootedId &id = rootId0;
     FETCH_ELEMENT_ID(obj, -2, id);
     Value &value = regs.sp[-1];
@@ -3874,16 +3891,26 @@ END_CASE(JSOP_ARRAYPUSH)
   thread_loop:
     //std::cout << "PC: " << regs.pc << "\n";
 
-    loopdata = notes.getLoop(regs.pc);
-    
-    dout << "Creating thread " << counter << endl;
-    std::thread mythread(ThreadInterpret, counter, cx, &regs, offset, original_pc, loopdata.update);
-    mythread.join();
-    dout << "Thread " << counter << " finished." << endl;
-    counter++;
-    len = 0;
-    regs.pc = loopdata.update;
-    DO_NEXT_OP(len);
-    // goto advance_pc_by_one;
+    // If new loop, reset counter.
+    if (regs.pc != current_loop) {
+        current_loop = regs.pc;
+        counter = 1;
+    }
+
+    if (notes.loopExists(regs.pc)) {
+        inloop = true;
+        loopdata = notes.getLoop(regs.pc);
+        
+        dout << "Creating thread " << counter << endl;
+        loop_threads.push(std::thread(ThreadInterpret, counter, regs.pc, cx, &regs, offset, original_pc, loopdata.update, &rootValue0, &rootValue1,
+        &rootObject0, &rootObject1, &rootObject2, &rootId0));
+        //dout << "Thread " << counter << " finished." << endl;
+        counter++;
+        len = 0;
+        regs.pc = loopdata.update;
+        DO_NEXT_OP(len);
+    } else {
+        goto advance_pc_by_one;
+    }
 }
 
