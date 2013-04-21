@@ -1,13 +1,19 @@
 #include <iostream>
 #include <thread>
 
-#define DOUT
+//#define DOUT2
 
 #ifdef DOUT 
 #define dout cout << __FILE__ << "(" << __LINE__ << ") DEBUG: "
 #else
 #define dout 0 && std::cout
 #endif /* DEBUG */
+
+#ifdef DOUT
+#define dprintf(fmt, ...) do { printf(fmt, __VA_ARGS__); } while (0)
+#else
+#define dprinf(fmt, ...) 0
+#endif
 
 using namespace std;
 
@@ -25,13 +31,21 @@ using namespace std;
 #define POP_COPY_TO(v)           v = *--regs.sp
 #define POP_RETURN_VALUE()       regs.fp()->setReturnValue(*--regs.sp)
 
+# define BEGIN_CASE2(OP)     case OP: 
+//# define BEGIN_CASE2(OP)     case OP: printf(#OP); printf("\n");
 JS_NEVER_INLINE void
-ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, RootedValue *rootValue0, RootedValue *rootValue1,
-    RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0)
+ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, 
+        RootedValue *rootValue0, RootedValue *rootValue1, RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0)
 {
+//    JSContext
+    // sleep(1);
     FrameRegs regs = *orig_regs;
     regs.pc = start_pc;
-    dout << "Thread " << id << ", PC: " << regs.pc - original_pc << ", Stop: " << stop_pc - original_pc << endl;
+    // Copy stack.
+    Value temp = *(regs.sp);
+    regs.sp = &temp;
+    dprintf("[New Thread] ID: %d, Start: %d, Stop: %d\n", id, regs.pc - original_pc, stop_pc - original_pc);
+    // dout << "Thread " << id << ", PC: " << regs.pc - original_pc << ", Stop: " << stop_pc - original_pc << endl;
 #include "interp-defines.h"
     /*
      * It is important that "op" be initialized before calling DO_OP because
@@ -70,11 +84,12 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
         regs.pc += len; // Set pc (len set by last op to execute)
         offset = regs.pc - original_pc ;
         op = (JSOp) *(regs.pc); // Get the opcode
-        dout << "PC:" << offset << " Opcode: " << op << std::endl;
+        dprintf("[Thread %d] PC: %d  Opcode: %d\n", id, offset, op);
+        // dout << "PC:" << offset << " Opcode: " << op << std::endl;
 
       do_op:
         if (regs.pc == stop_pc) {
-            //(*orig_regs) = regs;
+//            (*orig_regs) = regs;
             return;
         }
 
@@ -96,18 +111,18 @@ printf("TRACE: EMPTY\n");
 #endif
 END_EMPTY_CASES
 
-BEGIN_CASE(JSOP_LOOPHEAD)
+BEGIN_CASE2(JSOP_LOOPHEAD)
 #ifdef TRACEIT
 printf("TRACE: JSOP_LOOPHEAD\n");
 #endif
 END_EMPTY_CASES
-BEGIN_CASE(JSOP_LOOPENTRY)
+BEGIN_CASE2(JSOP_LOOPENTRY)
 #ifdef TRACEIT
 printf("TRACE: JSOP_LOOPENTRY\n");
 #endif
 END_EMPTY_CASES
 
-BEGIN_CASE(JSOP_LABEL)
+BEGIN_CASE2(JSOP_LABEL)
 END_CASE(JSOP_LABEL)
 
 check_backedge:
@@ -120,17 +135,17 @@ check_backedge:
 }
 
 /* ADD_EMPTY_CASE is not used here as JSOP_LINENO_LENGTH == 3. */
-BEGIN_CASE(JSOP_LINENO)
+BEGIN_CASE2(JSOP_LINENO)
 END_CASE(JSOP_LINENO)
 
-BEGIN_CASE(JSOP_UNDEFINED)
+BEGIN_CASE2(JSOP_UNDEFINED)
 #ifdef TRACEIT
     printf("TRACE: JSOP_UNDEFINED\n");
 #endif
     regs.sp++->setUndefined();
 END_CASE(JSOP_UNDEFINED)
 
-BEGIN_CASE(JSOP_BINDGNAME)
+BEGIN_CASE2(JSOP_BINDGNAME)
 #ifdef TRACEIT
         printf("TRACE: JSOP_BINDGNAME\n");
 #endif
@@ -140,10 +155,10 @@ BEGIN_CASE(JSOP_BINDGNAME)
 	// PUSH_OBJECT(regs.fp()->global());
 END_CASE(JSOP_BINDGNAME)
 
-BEGIN_CASE(JSOP_GETGNAME)
-BEGIN_CASE(JSOP_CALLGNAME)
-BEGIN_CASE(JSOP_NAME)
-BEGIN_CASE(JSOP_CALLNAME)
+BEGIN_CASE2(JSOP_GETGNAME)
+BEGIN_CASE2(JSOP_CALLGNAME)
+BEGIN_CASE2(JSOP_NAME)
+BEGIN_CASE2(JSOP_CALLNAME)
 {
 #ifdef TRACEIT
     printf("TRACE: JSOP_{GETGNAME,CALLGNAME,NAME,CALLNAME}\n");
@@ -163,14 +178,14 @@ BEGIN_CASE(JSOP_CALLNAME)
 }
 END_CASE(JSOP_NAME)
 
-BEGIN_CASE(JSOP_ONE)
+BEGIN_CASE2(JSOP_ONE)
 #ifdef TRACEIT
     printf("TRACE: JSOP_ONE\n");
 #endif
     regs.sp++->setInt32(1);
 END_CASE(JSOP_ONE)
 
-BEGIN_CASE(JSOP_ADD)
+BEGIN_CASE2(JSOP_ADD)
 {
 #ifdef TRACEIT
     printf("TRACE: JSOP_ADD\n");
@@ -183,8 +198,8 @@ BEGIN_CASE(JSOP_ADD)
 }
 END_CASE(JSOP_ADD)
 
-BEGIN_CASE(JSOP_SETGNAME)
-BEGIN_CASE(JSOP_SETNAME)
+BEGIN_CASE2(JSOP_SETGNAME)
+BEGIN_CASE2(JSOP_SETNAME)
 {
 #ifdef TRACEIT
     printf("TRACE JSOP_{SETGNAME,SETNAME}\n");
@@ -202,14 +217,14 @@ BEGIN_CASE(JSOP_SETNAME)
 }
 END_CASE(JSOP_SETNAME)
 
-BEGIN_CASE(JSOP_POP)
+BEGIN_CASE2(JSOP_POP)
 #ifdef TRACEIT
     printf("TRACE: JSOP_POP\n");
 #endif
     regs.sp--;
 END_CASE(JSOP_POP)
 
-BEGIN_CASE(JSOP_SETELEM)
+BEGIN_CASE2(JSOP_SETELEM)
 {
 #ifdef TRACEIT
     printf("TRACE: JSOP_SETELEM\n");
@@ -241,23 +256,23 @@ BEGIN_CASE(JSOP_SETELEM)
 }
 END_CASE(JSOP_SETELEM)
 
-BEGIN_CASE(JSOP_NEW)
-BEGIN_CASE(JSOP_CALL)
-BEGIN_CASE(JSOP_FUNCALL)
+BEGIN_CASE2(JSOP_NEW)
+BEGIN_CASE2(JSOP_CALL)
+BEGIN_CASE2(JSOP_FUNCALL)
 {
     std::cout << "Functions not supported in loop. " << std::endl << "Opcode: " << op  << " PC: " << regs.pc - original_pc << std::endl;
     goto error;
 }
 END_CASE(JSOP_NEW)
     
-BEGIN_CASE(JSOP_ZERO)
+BEGIN_CASE2(JSOP_ZERO)
 #ifdef TRACEIT
     printf("TRACE: JSOP_ZERO\n");
 #endif
     PUSH_INT32(0);
 END_CASE(JSOP_ZERO)
 
-BEGIN_CASE(JSOP_DIV)
+BEGIN_CASE2(JSOP_DIV)
 {
     RootedValue &lval = *rootValue0; 
     RootedValue &rval = *rootValue1;
@@ -269,11 +284,11 @@ BEGIN_CASE(JSOP_DIV)
 }
 END_CASE(JSOP_DIV)
 
-BEGIN_CASE(JSOP_INT8)
+BEGIN_CASE2(JSOP_INT8)
     PUSH_INT32(GET_INT8(regs.pc));
 END_CASE(JSOP_INT8)
 
-BEGIN_CASE(JSOP_MUL)
+BEGIN_CASE2(JSOP_MUL)
 {
     RootedValue &lval = *rootValue0, &rval = *rootValue1;
     lval = regs.sp[-2];
@@ -284,8 +299,8 @@ BEGIN_CASE(JSOP_MUL)
 }
 END_CASE(JSOP_MUL)
 
-BEGIN_CASE(JSOP_GETELEM)
-BEGIN_CASE(JSOP_CALLELEM)
+BEGIN_CASE2(JSOP_GETELEM)
+BEGIN_CASE2(JSOP_CALLELEM)
 {
     std::cout << "JSOP_GETELEM AND JSOP_CALLELEM currently giving problems\n";
     goto error;
@@ -306,7 +321,7 @@ BEGIN_CASE(JSOP_CALLELEM)
 END_CASE(JSOP_GETELEM)
 
 
-BEGIN_CASE(JSOP_DUP)
+BEGIN_CASE2(JSOP_DUP)
 {
 #ifdef TRACEIT
     printf("TRACE: JSOP_DUP\n");

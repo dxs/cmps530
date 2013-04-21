@@ -1109,6 +1109,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
     /* Repoint cx->regs to a local variable for faster access. */
     FrameRegs regs = cx->regs();
+    // printf("%p\n", regs.sp);
     // CAL Store original pc physical pointer address.
     // Allows for computing offset based (virtual address) pc.
     jsbytecode *original_pc = regs.pc;
@@ -3895,6 +3896,7 @@ END_CASE(JSOP_ARRAYPUSH)
     if (regs.pc != current_loop) {
         current_loop = regs.pc;
         counter = 1;
+        //regs.sp++;
     }
 
     if (notes.loopExists(regs.pc)) {
@@ -3904,10 +3906,13 @@ END_CASE(JSOP_ARRAYPUSH)
         dout << "Creating thread " << counter << endl;
         loop_threads.push(std::thread(ThreadInterpret, counter, regs.pc, cx, &regs, offset, original_pc, loopdata.update, &rootValue0, &rootValue1,
         &rootObject0, &rootObject1, &rootObject2, &rootId0));
+        //loop_threads.front().join();
+        //loop_threads.pop();
+        // printf("%p\n", regs.sp);
         //dout << "Thread " << counter << " finished." << endl;
         counter++;
         len = 0;
-        regs.pc = loopdata.update;
+        regs.pc = loopdata.update + 1;
         DO_NEXT_OP(len);
     } else {
         goto advance_pc_by_one;
