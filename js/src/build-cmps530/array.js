@@ -1,8 +1,6 @@
-var myarray = new Array(5,4,3,2)
-var j = 0;
+var myarray = new Array(1,2,3)
 
 for (i=0; i<15; ++i){
-    j = i;
     myarray[i] = i;
 }
 
