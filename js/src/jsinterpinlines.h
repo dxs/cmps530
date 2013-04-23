@@ -774,9 +774,9 @@ static JS_ALWAYS_INLINE bool
 SetObjectElementOperation(JSContext *cx, Handle<JSObject*> obj, HandleId id, const Value &value, bool strict)
 {
     types::TypeScript::MonitorAssign(cx, obj, id);
-
-    do {
+        do {
         if (obj->isDenseArray() && JSID_IS_INT(id)) {
+        	//printf("Setting element here\n");
             uint32_t length = obj->getDenseArrayInitializedLength();
             int32_t i = JSID_TO_INT(id);
             if ((uint32_t)i < length) {
@@ -789,7 +789,44 @@ SetObjectElementOperation(JSContext *cx, Handle<JSObject*> obj, HandleId id, con
                 obj->setDenseArrayElementWithType(cx, i, value);
                 return true;
             } else {
-                JSScript *script;
+            	JSScript *script;
+                jsbytecode *pc;
+                types::TypeScript::GetPcScript(cx, &script, &pc);
+
+                if (script->hasAnalysis())
+                    script->analysis()->getCode(pc).arrayWriteHole = true;
+            }
+        }
+    } while (0);
+
+    RootedValue tmp(cx, value);
+    return JSObject::setGeneric(cx, obj, obj, id, &tmp, strict);
+}
+
+/* CAL */
+static JS_ALWAYS_INLINE bool
+SetObjectElementOperationThread(JSContext *cx, Handle<JSObject*> obj, HandleId id, const Value &value, bool strict)
+{
+	printf("Time to set element\n");
+    //types::TypeScript::MonitorAssign(cx, obj, id);
+        do {
+        if (obj->isDenseArray() && JSID_IS_INT(id)) {
+        	printf("Setting element ");
+            uint32_t length = obj->getDenseArrayInitializedLength();
+            int32_t i = JSID_TO_INT(id);
+            if ((uint32_t)i < length) {
+                if (obj->getDenseArrayElement(i).isMagic(JS_ARRAY_HOLE)) {
+                    if (js_PrototypeHasIndexedProperties(cx, obj))
+                        break;
+                    if ((uint32_t)i >= obj->getArrayLength())
+                        obj->setArrayLength(cx, i + 1);
+                }
+                obj->setDenseArrayElementWithType(cx, i, value);
+                printf("here\n");
+                return true;
+            } else {
+            	printf("there\n");
+            	JSScript *script;
                 jsbytecode *pc;
                 types::TypeScript::GetPcScript(cx, &script, &pc);
 

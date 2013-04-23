@@ -39,7 +39,12 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 {
 //    JSContext
     // sleep(1);
-    FrameRegs regs = *orig_regs;
+    Rooted<JSScript*> script(cx);
+//    SET_SCRIPT(regs.fp()->script());
+    FrameRegs regs = cx->regs();
+
+
+    //FrameRegs regs = *orig_regs;
     regs.pc = start_pc;
     // Copy stack.
     Value temp = *(regs.sp);
@@ -249,8 +254,11 @@ BEGIN_CASE2(JSOP_SETELEM)
     }
     // ^^^^^^
     Value &value = regs.sp[-1];
-    // if (!SetObjectElementOperation(cx, obj, id, value, script->strictModeCode))
-    //     goto error;
+    bool doexit = false;
+
+    if (!SetObjectElementOperationThread(cx, obj, id, value, script->strictModeCode))
+        goto error;
+
     regs.sp[-3] = value;
     regs.sp -= 2;
 }
