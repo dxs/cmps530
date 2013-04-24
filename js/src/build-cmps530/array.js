@@ -1,7 +1,7 @@
-var myarray = new Array(1,2,3)
+var myarray = new Array()
 
 for (i=0; i<15; ++i){
-    myarray[i] = i;
+    myarray[i] = 0;
 }
 
 print("Array: " + myarray);

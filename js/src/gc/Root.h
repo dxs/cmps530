@@ -151,7 +151,7 @@ class Handle : public HandleBase<T>
     operator T () const { return get(); }
     T operator ->() const { return get(); }
 
-  private:
+  //private:
     Handle() {}
 
     const T *ptr;
@@ -219,7 +219,7 @@ class MutableHandle : public MutableHandleBase<T>
     operator T () const { return get(); }
     T operator ->() const { return get(); }
 
-  private:
+  //private:
     MutableHandle() {}
 
     T *ptr;

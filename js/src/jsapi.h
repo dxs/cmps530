@@ -591,7 +591,7 @@ class Value
    * in C++ but by value in C (bug 645111).
    * Same issue for SPARC ABI. (bug 737344).
    */
-  private:
+  //private:
 #endif
 
     jsval_layout data;

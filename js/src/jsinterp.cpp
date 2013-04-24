@@ -16,6 +16,7 @@
 #include <iostream>
 #include <thread>
 #include <queue>
+#include <set>
 #include "cmps530.h"
 
 /* Manual tracing using individual printfs */
@@ -1068,9 +1069,10 @@ TypeCheckNextBytecode(JSContext *cx, JSScript *script, unsigned n, const FrameRe
 }
 
 #include "cmps530-threading.cpp"
-
+// CAL Debug defines
 #undef DOUT
 #undef dout
+#undef dprintf
 
 //#define DOUT
 
@@ -1080,20 +1082,30 @@ TypeCheckNextBytecode(JSContext *cx, JSScript *script, unsigned n, const FrameRe
 #define dout 0 && std::cout
 #endif /* DEBUG */
 
+#ifdef DOUT
+#define dprintf(fmt, ...) do { printf(fmt, __VA_ARGS__); } while (0)
+#else
+#define dprinf(fmt, ...) 0
+#endif
+
+
 JS_NEVER_INLINE bool
 js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 {
 
 #include "interp-defines.h"
 
-    // CAL
-    int counter = 1;  // Hack until I figure out how to retrieve js variable values
+    // CAL Top of interpret function
+	jsval_layout tempval;
+    int counter = 0;  // Hack until I figure out how to retrieve js variable values
     int offset;
     std::map<jsbytecode*, int> visited_pc;
     Loop loopdata;
     jsbytecode* current_loop = NULL;
     std::queue<std::thread> loop_threads;
     bool inloop = false;
+    std::map<std::thread::id,std::set<void *>> read;
+    std::map<std::thread::id,std::set<void *>> wrote;
 
     JSAutoResolveFlags rf(cx, RESOLVE_INFER);
 
@@ -2462,6 +2474,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     }
     */
     RootedValue &rval = rootValue0;
+
 
     if (!NameOperation(cx, script, regs.pc, rval.address()))
         goto error;
@@ -3895,22 +3908,22 @@ END_CASE(JSOP_ARRAYPUSH)
     // If new loop, reset counter.
     if (regs.pc != current_loop) {
         current_loop = regs.pc;
-        counter = 1;
+        counter = 0;
         //regs.sp++;
     }
 
     if (notes.loopExists(regs.pc)) {
         inloop = true;
         loopdata = notes.getLoop(regs.pc);
+        counter++;
         
-        dout << "Creating thread " << counter << endl;
+        dprintf("Creating thread %d\n", counter);
         loop_threads.push(std::thread(ThreadInterpret, counter, regs.pc, cx, &regs, offset, original_pc, loopdata.update, &rootValue0, &rootValue1,
-        &rootObject0, &rootObject1, &rootObject2, &rootId0));
+        &rootObject0, &rootObject1, &rootObject2, &rootId0, &script));//, read,wrote));
         //loop_threads.front().join();
         //loop_threads.pop();
         // printf("%p\n", regs.sp);
         //dout << "Thread " << counter << " finished." << endl;
-        counter++;
         len = 0;
         regs.pc = loopdata.update + 1;
         DO_NEXT_OP(len);

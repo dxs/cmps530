@@ -2,14 +2,16 @@
 #include <thread>
 
 //#define DOUT2
+#undef dout
+#undef dprintf
 
-#ifdef DOUT 
+#ifdef DOUT2
 #define dout cout << __FILE__ << "(" << __LINE__ << ") DEBUG: "
 #else
 #define dout 0 && std::cout
 #endif /* DEBUG */
 
-#ifdef DOUT
+#ifdef DOUT2
 #define dprintf(fmt, ...) do { printf(fmt, __VA_ARGS__); } while (0)
 #else
 #define dprinf(fmt, ...) 0
@@ -35,12 +37,14 @@ using namespace std;
 //# define BEGIN_CASE2(OP)     case OP: printf(#OP); printf("\n");
 JS_NEVER_INLINE void
 ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, 
-        RootedValue *rootValue0, RootedValue *rootValue1, RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0)
+        RootedValue *rootValue0, RootedValue *rootValue1, RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0,
+        Rooted<JSScript*> * script)//,
 {
+        //std::map<std::thread::id,std::set<void *>> read_map, std::map<std::thread::id,std::set<void *>> wrote_map)
 //    JSContext
     // sleep(1);
-    Rooted<JSScript*> script(cx);
-//    SET_SCRIPT(regs.fp()->script());
+    //Rooted<JSScript*> script(cx);
+    //SET_SCRIPT(regs.fp()->script());
     FrameRegs regs = cx->regs();
 
 
@@ -62,6 +66,9 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
     int32_t len=0;
     int switchOp;
     register int switchMask = 0;
+
+    std::set<void *> read;
+    std::set<void *> wrote;
 
     DO_NEXT_OP(len);
 
@@ -94,6 +101,14 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 
       do_op:
         if (regs.pc == stop_pc) {
+            printf("Read\n");
+            for (std::set<void *>::iterator i = read.begin(); i != read.end(); ++i) {
+                printf("%p\n", *i);
+            }
+            printf("Wrote\n");
+            for (std::set<void *>::iterator i = wrote.begin(); i != wrote.end(); ++i) {
+                printf("%p\n", *i);
+            }
 //            (*orig_regs) = regs;
             return;
         }
@@ -175,8 +190,11 @@ BEGIN_CASE2(JSOP_CALLNAME)
     */
     RootedValue &rval = *rootValue0;
 
-    // if (!NameOperation(cx, script, regs.pc, rval.address()))
-    //     goto error;
+    //  if (!NameOperation(cx, script, regs.pc, rval.address()))
+    //      goto error;
+    RootedPropertyName name(cx, (*script)->getName(regs.pc));
+
+    read.insert(rval.ptr.data.asPtr);
 
     *(regs.sp++) = rval; //assertSameCompartment(cx, regs.sp[-1]); } while (0)
     // TypeScript::Monitor(cx, script, regs.pc, rval);
@@ -217,6 +235,8 @@ BEGIN_CASE2(JSOP_SETNAME)
     // if (!SetNameOperation(cx, script, regs.pc, scope, value))
     //     goto error;
 
+    wrote.insert(value.ptr->data.asPtr);
+
     regs.sp[-2] = regs.sp[-1];
     regs.sp--;
 }
@@ -237,30 +257,35 @@ BEGIN_CASE2(JSOP_SETELEM)
     RootedObject &obj = *rootObject0;
     // FETCH_OBJECT(cx, -3, obj);
     // vvvvv
-    HandleValue val = HandleValue::fromMarkedLocation(&regs.sp[-3]);
+
+    HandleValue val = HandleValue::fromMarkedLocation(&regs.sp[-3]); // Bottom of stack?  Global object?
     obj = ToObject(cx, (val));
     if (!obj) {
         cout << "Failed ToObject\n";
         goto error;
     }
     // ^^^^^
-    RootedId &id = *rootId0;
+    RootedId &rid = *rootId0;
     // FETCH_ELEMENT_ID(obj, -2, id);
     // vvvvvv
-    const Value &idval_ = regs.sp[-2];                                     
-    if (!ValueToId(cx, obj, idval_, id.address())) {
+    const Value &idval_ = regs.sp[-2];   // the array
+    if (!ValueToId(cx, obj, idval_, rid.address())) {
         dout << "Failed ValueToID." << endl;
         goto error;  
     }
     // ^^^^^^
-    Value &value = regs.sp[-1];
+    Value &value = regs.sp[-1]; // index into array
     bool doexit = false;
+    // CAL I'm working here
+    dprintf("[%d] Setting Object.  Location %p or %p or %p\n", id, regs.sp - 3, regs.sp - 2, regs.sp - 1 );
 
-    if (!SetObjectElementOperationThread(cx, obj, id, value, script->strictModeCode))
-        goto error;
 
-    regs.sp[-3] = value;
-    regs.sp -= 2;
+
+    //if (!SetObjectElementOperationThread(cx, obj, rid, value, script->strictModeCode))
+    //    goto error;
+
+    //regs.sp[-3] = value;
+    //regs.sp -= 2;
 }
 END_CASE(JSOP_SETELEM)
 
