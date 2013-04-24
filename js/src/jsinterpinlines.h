@@ -807,12 +807,10 @@ SetObjectElementOperation(JSContext *cx, Handle<JSObject*> obj, HandleId id, con
 static JS_ALWAYS_INLINE bool
 SetObjectElementOperationThread(JSContext *cx, Handle<JSObject*> obj, HandleId id, const Value &value, bool strict)
 {
-	printf("Time to set element\n");
-    //types::TypeScript::MonitorAssign(cx, obj, id);
+	//types::TypeScript::MonitorAssign(cx, obj, id);
         do {
         if (obj->isDenseArray() && JSID_IS_INT(id)) {
-        	printf("Setting element ");
-            uint32_t length = obj->getDenseArrayInitializedLength();
+        	uint32_t length = obj->getDenseArrayInitializedLength();
             int32_t i = JSID_TO_INT(id);
             if ((uint32_t)i < length) {
                 if (obj->getDenseArrayElement(i).isMagic(JS_ARRAY_HOLE)) {
@@ -822,10 +820,8 @@ SetObjectElementOperationThread(JSContext *cx, Handle<JSObject*> obj, HandleId i
                         obj->setArrayLength(cx, i + 1);
                 }
                 obj->setDenseArrayElementWithType(cx, i, value);
-                printf("here\n");
                 return true;
             } else {
-            	printf("there\n");
             	JSScript *script;
                 jsbytecode *pc;
                 types::TypeScript::GetPcScript(cx, &script, &pc);

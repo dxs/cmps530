@@ -101,13 +101,11 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 
       do_op:
         if (regs.pc == stop_pc) {
-            printf("Read\n");
             for (std::set<void *>::iterator i = read.begin(); i != read.end(); ++i) {
-                printf("%p\n", *i);
+                printf("[%d] Read %p\n",id, *i);
             }
-            printf("Wrote\n");
             for (std::set<void *>::iterator i = wrote.begin(); i != wrote.end(); ++i) {
-                printf("%p\n", *i);
+                printf("[%d] Wrote %p\n", id, *i);
             }
 //            (*orig_regs) = regs;
             return;
@@ -190,9 +188,9 @@ BEGIN_CASE2(JSOP_CALLNAME)
     */
     RootedValue &rval = *rootValue0;
 
-    //  if (!NameOperation(cx, script, regs.pc, rval.address()))
-    //      goto error;
-    RootedPropertyName name(cx, (*script)->getName(regs.pc));
+      if (!NameOperation(cx, (*script), regs.pc, rval.address()))
+          goto error;
+//    RootedPropertyName name(cx, (*script)->getName(regs.pc));
 
     read.insert(rval.ptr.data.asPtr);
 
@@ -281,11 +279,13 @@ BEGIN_CASE2(JSOP_SETELEM)
 
 
 
-    //if (!SetObjectElementOperationThread(cx, obj, rid, value, script->strictModeCode))
+    //if (!SetObjectElementOperationThread(cx, obj, rid, value, (*script)->strictModeCode))
     //    goto error;
 
-    //regs.sp[-3] = value;
-    //regs.sp -= 2;
+    wrote.insert(idval_.data.asPtr);
+    wrote.insert(value.data.asPtr);
+    regs.sp[-3] = value;
+    regs.sp -= 2;
 }
 END_CASE(JSOP_SETELEM)
 
