@@ -1241,7 +1241,10 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
      * Like the above table says, this doesn't look like it, but it's a loop.
      * The main loop in fact.  regs.pc += len moves the program counter (len is
      * set from a table by the operation last executed).  The next line grabs the
-     * opcode and the switch selects the proper action.
+     * opcode and the switch selects the proper action.  Every instruction execution is
+     * responsible for setting len correctly and calling a goto advance_pc.  (There are
+     * a few exceptions that set regs.pc directly and goto do_op instead.  Grep on regs.pc
+     * to find them.
      */
 #else /* !JS_THREADED_INTERP */
     for (;;) {
@@ -3901,7 +3904,10 @@ END_CASE(JSOP_ARRAYPUSH)
     */
 
     return interpReturnOK;
-  
+  /*
+   * CAL This label must be here at the bottom because a goto cannot cross over a
+   * variable definition.  This code defines variables.
+   */
   thread_loop:
     //std::cout << "PC: " << regs.pc << "\n";
 

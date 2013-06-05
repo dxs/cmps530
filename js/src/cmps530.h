@@ -8,7 +8,6 @@
 
 using namespace js;
 
-
 typedef enum LoopType {
     JSLOOP_FOR,
     JSLOOP_WHILE,
@@ -48,9 +47,18 @@ class ScriptNotes {
     JSScript *script;
     jsbytecode *original_pc;
     instr_map instruction_notes; // The disassembled notes
-    //Intruction * instr;
-                                                       // Indexed by pc
+
   public:
+    /**
+     * Interpret the stored source notes.
+     *
+     * Implementation taken from following the DisassembleScript function in shell/js.cpp. (The js
+     * shell implements a disassemble function.)
+     *
+     * This would be more efficient if instead of reverse engineering the source notes, we stored
+     * the source notes when they were created.  This, however, would require understanding the JIT.
+     * Since reversing the notes occurs whether threading is enabled or not, the test is not impacted.
+     */
     ScriptNotes(JSContext *c, JSScript *s, jsbytecode *p) : cx(c), script(s), original_pc(p)
     {
         //"ofs", "line", "pc", "delta", "desc", "args");
@@ -170,15 +178,6 @@ class ScriptNotes {
             //Sprint(sp, "\n");
         }
     }
-
-    /* Return an iterator to the instruction at the pc */
-    // Instruction * getInstruction(unsigned pc) {
-    //     if (instruction_notes.count(pc)) {
-    //         return instruction_notes[pc];
-    //     } else {
-    //         return NULL;
-    //     }
-    // }
 
     Loop getLoop(jsbytecode * loophead) {
         return instruction_notes[loophead]->loopdata;

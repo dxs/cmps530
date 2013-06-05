@@ -1,7 +1,10 @@
 #include <iostream>
 #include <thread>
 
+// Uncomment to turn on debugging output for this file.
 //#define DOUT2
+
+// Hack to get around the fact that it's defined in jsinterp.
 #undef dout
 #undef dprintf
 
@@ -35,15 +38,25 @@ using namespace std;
 
 # define BEGIN_CASE2(OP)     case OP: 
 //# define BEGIN_CASE2(OP)     case OP: printf(#OP); printf("\n");
+/**
+ * CAL The interpret function to be ran in a thread.
+ *
+ * This is the Interpret function from jsinterp.cpp copy-pasted over and stripped down.  Not every
+ * instruction type is supported by this function.  If a non-supported opcode is found, the thread will
+ * exit with a message.  (See jsopcode.tbl for a listing of all opcodes.)  The method I was using was I
+ * first removed all opcode implementations, execute the desired javascript file, copy in missing opcodes
+ * and get it to work.
+ *
+ * An important note, regs.sp is a pointer in this function while it was not in jsinterp.  You'll need to
+ * change the accesses accordingly.
+ */
 JS_NEVER_INLINE void
 ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, 
         RootedValue *rootValue0, RootedValue *rootValue1, RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0,
         Rooted<JSScript*> * script)//,
 {
-        //std::map<std::thread::id,std::set<void *>> read_map, std::map<std::thread::id,std::set<void *>> wrote_map)
-//    JSContext
-    // sleep(1);
-    //Rooted<JSScript*> script(cx);
+
+	//Rooted<JSScript*> script(cx);
     //SET_SCRIPT(regs.fp()->script());
     FrameRegs regs = cx->regs();
 

@@ -1,9 +1,0 @@
-../configure --disable-methodjit --disable-monoic --disable-optimize --disable-tests
-
-JS_THREADSAFE is not set.
-
-Script stored in class jsscript.h -> JSScript
-    * Contains type Bindings to hold bindings
-    * notes() of type jssrcnote*
-
--lboost_thread -lboost_system -lboost_date_time -lboost_filesystem -lboost_iostreams -lboost_program_options -lboost_serialization -lboost_wserialization
