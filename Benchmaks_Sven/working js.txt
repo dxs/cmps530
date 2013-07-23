@@ -1,0 +1,73 @@
+works
+
+
+
+
+
+
+
+
+3d-raytrace.js
+access-fannkuch.js
+access-nsieve.js
+bitops-3bit-bits-in-byte.js
+bitops-bits-in-byte.js
+bitops-nsieve-bits.js
+crypto-aes.js
+crypto-md5.js
+crypto-sha1.js
+math-cordic.js
+regexp-dna.js
+string-fasta.js
+string-tagcloud.js
+string-validate-input.js
+
+
+
+
+
+
+
+
+
+
+
+do not works
+
+3d-Morph.js	JSOP_GETELEM and JSOP_CALLELEM currently giving problems// Bailing out
+
+access-binary-trees.js		Unimplemented opcode: Unimplemented opcode: 184184Unimplemented opcode: 184// Bailing out
+
+acces-nbody.js	Unimplemented opcode: 130Unimplemented opcode: 130	Bailing out
+
+bitops-bitwise-and.js	Unimplemented opcode: 17	Bailing out
+
+controlflow-recursive.js	Functions not supported in loop.	Opcode: 58 PC: 55
+
+date-format-tofte.js	Unimplemented opcode: 184	Bailing out
+
+date-format-xparb.js	Unimplemented opcode: 184	Bailing out
+
+math-partial-sums.js	Functions not supported in loop.	Opcode: 58 PC: 42	Bailing out
+
+math-spectral-norm.js	Functions not supported in loop.
+
+			Opcode: 58 PC: 65
+			Bailing out
+			Functions not supported in loop.
+			Opcode: 58 PC: 65
+			Bailing out
+			Bailing out
+
+string-base64.js	sunspider/string-base64.js:122:8 String is not defined
+			sunspider/string-base64.js:122:8 String is not defined
+			Bailing out
+			Bailing out
+
+
+string-unpack-code.js	Unimplemented opcode: 130Unimplemented opcode:
+			Bailing out
+			130
+			Bailing out
+
+
