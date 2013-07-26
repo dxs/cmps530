@@ -1,0 +1,20 @@
+1. Open Eclipse and create a worpspace where you want.
+
+2. Go on menu File, select "New > Project > Makefile Project with Existing Code"
+
+3. Give a name to the project ("build-eclipse" for me) and write the location of your code (the /src folder). Do not forget to chose the correct toolchain for your platform. Then click finish.
+
+4. After Eclipse has finished to index the folder, go to the "File" menu and select "properties". Then, select "C/C++ Build".
+
+5. Under "Builder Setting", desactivate "Use default build command.
+
+6. Change "Build command" to read "make -w" and change the build location as the build directery configured in step 
+
+7. Open a Terminal, go to the directory ("build-eclipse) and type this command:
+../configure --disable-optimize --enable-debug-symbols --disable-methodjit --disable-monoic --disable-tests
+
+8. 
+
+
+
+
