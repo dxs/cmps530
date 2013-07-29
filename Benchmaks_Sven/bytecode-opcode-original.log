@@ -1,0 +1,64 @@
+N = 2, out[N-1] = 2
+--- SCRIPT sven-1e3.js:1 ---
+00000:   1  defvar "N"
+00005:   2  defvar "out"
+00010:   3  defvar "i"
+00015:   1  bindgname "N"
+00020:   1  int8 2
+00022:   1  setgname "N"
+00027:   1  pop
+00028:   2  bindgname "out"
+00033:   2  getgname "Array"
+00038:   2  undefined
+00039:   2  new 0
+00042:   2  setgname "out"
+00047:   2  pop
+00048:   3  getgname "i"
+00053:   3  pop
+00054:   8  bindgname "i"
+00059:   8  zero
+00060:   8  setgname "i"
+00065:   8  pop
+00066:   8  goto 121 (+55)
+00071:  10  loophead
+00072:  10  getgname "out"
+00077:  10  getgname "i"
+00082:  10  getgname "i"
+00087:  10  one
+00088:  10  add
+00089:  10  setelem
+00090:  10  pop
+00091:   8  gnameinc "i"
+00097:   8  bindgname "i"
+00102:   8  getgname "i"
+00107:   8  pos
+00108:   8  dup
+00109:   8  one
+00110:   8  add
+00111:   8  pick 2
+00113:   8  swap
+00114:   8  setgname "i"
+00119:   8  pop
+00120:   8  pop
+00121:   8  loopentry
+00122:   8  getgname "i"
+00127:   8  getgname "N"
+00132:   8  lt
+00133:   8  ifne 71 (-62)
+00138:  15  callgname "print"
+00143:  15  undefined
+00144:  15  string "N = "
+00149:  15  getgname "N"
+00154:  15  add
+00155:  15  string ", out[N-1] = "
+00160:  15  add
+00161:  15  getgname "out"
+00166:  15  getgname "N"
+00171:  15  one
+00172:  15  sub
+00173:  15  getelem
+00174:  15  add
+00175:  15  call 1
+00178:  15  pop
+00179:  15  stop
+--- END SCRIPT sven-1e3.js:1 ---
