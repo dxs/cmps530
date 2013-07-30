@@ -185,7 +185,7 @@ jsinterp.cpp
 	do-op:			1267
 				1285
 	do_switch:		1287
-	BEGIN_CASE(JSOP_EMPTY_CASE)1399
+	BEGIN_CASE(JSOP_LOOPHEAD)1399
 	advance_pc_by_one:	1251
 	advace_pc:		1253
 	BEGIN_CASE(JSOP_CALLNAME)2481
