@@ -37,7 +37,7 @@ BEGIN_CASE(JSOP_CALLELEM)
 	BEGIN_CASE(JSOP_POP)	1445
 
 	BEGIN_CASE(JSOP_GOTO)	1554
-	BEGIN_CASE(JSOP_LOOPHEAD)1399		//how to detect the loop//hox to know that there is 2 loop
+	BEGIN_CASE(JSOP_LOOPHEAD)1399		//how to detect the loop//how to know that there is 2 loop
 
 
 	BEGIN_CASE(JSOP_CALLNAME)2481		// i < N

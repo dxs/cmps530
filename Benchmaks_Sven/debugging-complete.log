@@ -1,0 +1,110 @@
+loc     op
+-----   --
+00000:  defvar "N"
+00005:  defvar "out"
+00010:  defvar "i"
+main:
+00015:  bindgname "N"
+00020:  int8 2
+00022:  setgname "N"
+00027:  pop
+00028:  bindgname "out"
+00033:  getgname "Array"
+00038:  undefined
+00039:  new 0
+00042:  setgname "out"
+00047:  pop
+00048:  getgname "i"
+00053:  pop
+00054:  bindgname "i"
+00059:  zero
+00060:  setgname "i"
+00065:  pop
+00066:  goto 121 (+55)
+00071:  loophead
+00072:  getgname "out"
+00077:  getgname "i"
+00082:  getgname "i"
+00087:  one
+00088:  add
+00089:  setelem
+00090:  pop
+00091:  gnameinc "i"
+00097:  bindgname "i"
+00102:  getgname "i"
+00107:  pos
+00108:  dup
+00109:  one
+00110:  add
+00111:  pick 2
+00113:  swap
+00114:  setgname "i"
+00119:  pop
+00120:  pop
+00121:  loopentry
+00122:  getgname "i"
+00127:  getgname "N"
+00132:  lt
+00133:  ifne 71 (-62)
+00138:  callgname "print"
+00143:  undefined
+00144:  string "N = "
+00149:  getgname "N"
+00154:  add
+00155:  string ", out[N-1] = "
+00160:  add
+00161:  getgname "out"
+00166:  getgname "N"
+00171:  one
+00172:  sub
+00173:  getelem
+00174:  add
+00175:  call 1
+00178:  pop
+00179:  stop
+
+Source notes:
+ ofs  line    pc  delta desc     args
+---- ---- ----- ------ -------- ------
+  0:    1     0 [   0] colspan 4
+  2:    1     5 [   5] newline 
+  3:    2     5 [   0] colspan 4
+  5:    2    10 [   5] newline 
+  6:    3    10 [   0] colspan 4
+  8:    3    15 [   5] setline  lineno 1
+ 10:    1    22 [   7] decl     offset 0
+ 12:    1    28 [   6] colspan 9
+ 14:    1    28 [   0] newline 
+ 15:    2    39 [  11] xdelta  
+ 16:    2    39 [   0] pcbase   offset 6
+ 18:    2    42 [   3] decl     offset 0
+ 20:    2    48 [   6] colspan 19
+ 22:    2    48 [   0] newline 
+ 23:    3    48 [   0] decl     offset 0
+ 25:    3    54 [   6] colspan 5
+ 27:    3    54 [   0] setline  lineno 8
+ 29:    8    54 [   0] colspan 5
+ 31:    8    65 [  11] xdelta  
+ 32:    8    65 [   0] for      cond 55 update 25 tail 67
+ 36:    8    71 [   6] setline  lineno 10
+ 38:   10    71 [   0] colspan 8
+ 40:   10    72 [   1] setline  lineno 9
+ 42:    9    72 [   0] newline 
+ 43:   10    72 [   0] colspan 8
+ 45:   10    89 [  17] xdelta  
+ 46:   10    89 [   0] pcbase   offset 17
+ 48:   10    91 [   2] setline  lineno 8
+ 50:    8    91 [   0] colspan 19
+ 52:    8   121 [  30] xdelta  
+ 53:    8   121 [   0] setline  lineno 10
+ 55:   10   121 [   0] setline  lineno 8
+ 57:    8   121 [   0] colspan 12
+ 59:    8   138 [  17] xdelta  
+ 60:    8   138 [   0] setline  lineno 10
+ 62:   10   138 [   0] colspan 23
+ 64:   10   138 [   0] setline  lineno 15
+ 66:   15   173 [  35] xdelta  
+ 67:   15   173 [   0] pcbase   offset 12
+ 69:   15   175 [   2] pcbase   offset 37
+ 71:   15   179 [   4] colspan 46
+
