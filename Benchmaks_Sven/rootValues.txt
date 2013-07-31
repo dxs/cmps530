@@ -1,0 +1,10 @@
+pc 	0xad70f1
+sp	0x7ffff5ffe398
+fp	0x7ffff62f2030
+
+rootValue0	0x7fffffff8b60
+rootValue1	0x7fffffff8b70
+rootObject0	0x7fffffff8ba0
+rootObject1	0x7fffffff8bb0
+rootObject2	0x7fffffff8bc0	
+
