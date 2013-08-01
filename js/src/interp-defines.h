@@ -1,5 +1,9 @@
-
+/* BANK */
 #define CHECK_PCCOUNT_INTERRUPTS() JS_ASSERT_IF(script->hasScriptCounts, switchMask == -1)
+
+//SP = Script Pointer
+#define CHECK_PCCOUNT_INTERRUPTS_SP() JS_ASSERT_IF((*script)->hasScriptCounts, switchMask == -1)
+
 
 # define DO_OP()            goto do_op
 # define DO_NEXT_OP(n)      JS_BEGIN_MACRO                                    \

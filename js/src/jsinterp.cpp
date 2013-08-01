@@ -20,7 +20,7 @@
 #include "cmps530.h"
 
 /* Manual tracing using individual printfs */
-//#define TRACEIT 1
+#define TRACEIT 1
 /* Trace using the single printf on BEGIN_CASE*/ 
 //#define TRACEAUTO 1
 /* Trace the PC as it executes */
@@ -287,7 +287,8 @@ js::RunScript(JSContext *cx, JSScript *script, StackFrame *fp)
     JS_ASSERT_IF(!fp->isGeneratorFrame(), cx->regs().pc == script->code);
     JS_ASSERT_IF(fp->isEvalFrame(), script->isActiveEval);
 #ifdef JS_METHODJIT_SPEW
-    JMCheckLogging();
+    /* Bank */
+    //JMCheckLogging();
 #endif
 
     JS_CHECK_RECURSION(cx, return false);
@@ -1269,6 +1270,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
         if (inloop && offset == loopdata.exit ){
             std::cout << "\nExiting loop\n";
             inloop = false;
+
             while (!loop_threads.empty()){
             	std::cout << "\nWaiting on thread\n";
                 loop_threads.front().join();
@@ -1279,6 +1281,11 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 #ifdef TRACKPC
         printf("PC:\t%d\n", offset);
 #endif
+        /* BANK */
+        /*xxx();
+        if (script->isGenerator) {
+            printf("script->isGenerator = true\n");
+        }*/
         CHECK_PCCOUNT_INTERRUPTS();
         switchOp = int(op) | switchMask; // ??
       do_switch:

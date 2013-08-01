@@ -3,6 +3,7 @@
 
 // Uncomment to turn on debugging output for this file.
 //#define DOUT2
+#define DEBUG_LOOP_PARALLEL
 
 // Hack to get around the fact that it's defined in jsinterp.
 #undef dout
@@ -127,7 +128,8 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 #ifdef TRACKPC
         printf("PC:\t%d\n", offset);
 #endif
-        CHECK_PCCOUNT_INTERRUPTS();
+        /* BANK */
+        CHECK_PCCOUNT_INTERRUPTS_SP();
         switchOp = int(op) | switchMask; // ??
       //do_switch:
         switch (switchOp) { // CAL Main instruction switch
@@ -138,18 +140,18 @@ ADD_EMPTY_CASE(JSOP_CONDSWITCH)
 ADD_EMPTY_CASE(JSOP_TRY)
 
 #ifdef TRACEIT
-printf("TRACE: EMPTY\n");
+printf("TRACE(thread): EMPTY\n");
 #endif
 END_EMPTY_CASES
 
 BEGIN_CASE2(JSOP_LOOPHEAD)
 #ifdef TRACEIT
-printf("TRACE: JSOP_LOOPHEAD\n");
+printf("TRACE(thread): JSOP_LOOPHEAD\n");
 #endif
 END_EMPTY_CASES
 BEGIN_CASE2(JSOP_LOOPENTRY)
 #ifdef TRACEIT
-printf("TRACE: JSOP_LOOPENTRY\n");
+printf("TRACE(thread): JSOP_LOOPENTRY\n");
 #endif
 END_EMPTY_CASES
 
@@ -171,14 +173,14 @@ END_CASE(JSOP_LINENO)
 
 BEGIN_CASE2(JSOP_UNDEFINED)
 #ifdef TRACEIT
-    printf("TRACE: JSOP_UNDEFINED\n");
+    printf("TRACE(thread): JSOP_UNDEFINED\n");
 #endif
     regs.sp++->setUndefined();
 END_CASE(JSOP_UNDEFINED)
 
 BEGIN_CASE2(JSOP_BINDGNAME)
 #ifdef TRACEIT
-        printf("TRACE: JSOP_BINDGNAME\n");
+        printf("TRACE(thread): JSOP_BINDGNAME\n");
 #endif
 	/* CAL Determine which name belongs to which global variable (???)
 	 * A global object or THE global object? */
@@ -192,7 +194,7 @@ BEGIN_CASE2(JSOP_NAME)
 BEGIN_CASE2(JSOP_CALLNAME)
 {
 #ifdef TRACEIT
-    printf("TRACE: JSOP_{GETGNAME,CALLGNAME,NAME,CALLNAME}\n");
+    printf("TRACE(thread): JSOP_{GETGNAME,CALLGNAME,NAME,CALLNAME}\n");
 #endif
     /* CAL
 	for (std::map<jsbytecode*, int>::iterator it = visited_pc.begin(); it != visited_pc.end(); it++){
@@ -214,7 +216,7 @@ END_CASE(JSOP_NAME)
 
 BEGIN_CASE2(JSOP_ONE)
 #ifdef TRACEIT
-    printf("TRACE: JSOP_ONE\n");
+    printf("TRACE(thread): JSOP_ONE\n");
 #endif
     regs.sp++->setInt32(1);
 END_CASE(JSOP_ONE)
@@ -222,7 +224,7 @@ END_CASE(JSOP_ONE)
 BEGIN_CASE2(JSOP_ADD)
 {
 #ifdef TRACEIT
-    printf("TRACE: JSOP_ADD\n");
+    printf("TRACE(thread): JSOP_ADD\n");
 #endif
     Value lval = regs.sp[-2];
     Value rval = regs.sp[-1];
@@ -236,7 +238,7 @@ BEGIN_CASE2(JSOP_SETGNAME)
 BEGIN_CASE2(JSOP_SETNAME)
 {
 #ifdef TRACEIT
-    printf("TRACE JSOP_{SETGNAME,SETNAME}\n");
+    printf("TRACE(thread): JSOP_{SETGNAME,SETNAME}\n");
 #endif
     RootedObject &scope = *rootObject0;
     scope = &regs.sp[-2].toObject();
@@ -255,16 +257,49 @@ END_CASE(JSOP_SETNAME)
 
 BEGIN_CASE2(JSOP_POP)
 #ifdef TRACEIT
-    printf("TRACE: JSOP_POP\n");
+    printf("TRACE(thread): JSOP_POP\n");
 #endif
     regs.sp--;
 END_CASE(JSOP_POP)
 
 BEGIN_CASE2(JSOP_SETELEM)
 {
-#ifdef TRACEIT
-    printf("TRACE: JSOP_SETELEM\n");
-#endif
+  #ifdef TRACEIT
+    printf("TRACE(thread): JSOP_SETELEM\n");
+  #endif
+
+  #ifdef DEBUG_LOOP_PARALLEL
+    Value tmpv = regs.sp[-2]; //examine ID
+    if (!tmpv.isInt32()) {
+        fprintf(stderr, "[DLP] SETELEM index is not int32");
+        exit(-1);
+    }
+    printf("[DLP][%d] SETELEM index=%d\n", id, tmpv.toInt32());
+  #endif /* DEBUG_LOOP_PARALLEL */
+
+    RootedObject &obj = *rootObject0;
+    FETCH_OBJECT(cx, -3, obj);
+    RootedId &rid = *rootId0;
+    FETCH_ELEMENT_ID(obj, -2, rid);
+    Value &value = regs.sp[-1];
+    if (!SetObjectElementOperation(cx, obj, rid, value, (*script)->strictModeCode))
+        goto error;
+    regs.sp[-3] = value;
+    regs.sp -= 2;
+
+
+  #ifdef DEBUG_LOOP_PARALLEL
+    if (!value.isInt32()) {
+        fprintf(stderr, "[DLP] SETELEM value is not int32");
+        exit(-1);
+    }
+    printf("[DLP][%d] SETELEM write val=%d to object %p with index = %d\n", 
+           id, value.toInt32(), NULL, tmpv.toInt32());
+  #endif /* DEBUG_LOOP_PARALLEL */
+
+
+
+/*
     RootedObject &obj = *rootObject0;
     // FETCH_OBJECT(cx, -3, obj);
     // vvvvv
@@ -299,6 +334,7 @@ BEGIN_CASE2(JSOP_SETELEM)
     wrote.insert(value.data.asPtr);
     regs.sp[-3] = value;
     regs.sp -= 2;
+*/
 }
 END_CASE(JSOP_SETELEM)
 
@@ -313,7 +349,7 @@ END_CASE(JSOP_NEW)
     
 BEGIN_CASE2(JSOP_ZERO)
 #ifdef TRACEIT
-    printf("TRACE: JSOP_ZERO\n");
+    printf("TRACE(thread): JSOP_ZERO\n");
 #endif
     PUSH_INT32(0);
 END_CASE(JSOP_ZERO)
@@ -351,7 +387,7 @@ BEGIN_CASE2(JSOP_CALLELEM)
     std::cout << "JSOP_GETELEM AND JSOP_CALLELEM currently giving problems\n";
     goto error;
 #ifdef TRACEIT
-    printf("TRACE: JSOP_{GETELEM,CALLELEM)\n");
+    printf("TRACE(thread): JSOP_{GETELEM,CALLELEM)\n");
 #endif
     MutableHandleValue lval = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
     HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
@@ -370,7 +406,7 @@ END_CASE(JSOP_GETELEM)
 BEGIN_CASE2(JSOP_DUP)
 {
 #ifdef TRACEIT
-    printf("TRACE: JSOP_DUP\n");
+    printf("TRACE(thread): JSOP_DUP\n");
 #endif
     //JS_ASSERT(regs.stackDepth() >= 1);
     const Value &rref = regs.sp[-1];
@@ -393,7 +429,7 @@ goto error;
     } /* for (;;) */
 
 error:
-cout << "Bailing out\n";
+cout << "ERROR Bailing out\n";
 exit(1);
 
 }
