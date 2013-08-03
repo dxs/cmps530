@@ -358,7 +358,7 @@ class Rooted : public RootedBase<T>
 
     Rooted() MOZ_DELETE;
     Rooted(const Rooted &) MOZ_DELETE;
-};
+}; //end of Rooted class
 
 template<typename T> template <typename S>
 inline

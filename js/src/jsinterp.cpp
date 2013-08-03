@@ -28,6 +28,9 @@
 /* Run loops in parallel */
 #define LOOP_PARALLEL 1
 
+#ifdef LOOP_PARALLEL
+#define NUM_LOOP_PER_THREAD 1
+#endif //LOOP_PARALLEL
 
 
 
@@ -98,6 +101,12 @@ printf("DANGER: JS_MONOIC ENABLED!!!\n");
 using namespace js;
 using namespace js::gc;
 using namespace js::types;
+
+#ifdef LOOP_PARALLEL
+enum LoopState {HEAD_STATE, ENTRY_STATE, UPDATE_STATE}; /* adding 3 states for loophead,
+		//sven											 * loopentry and update			*/
+#endif
+
 
 /* Some objects (e.g., With) delegate 'this' to another object. */
 static inline JSObject *
@@ -1096,17 +1105,34 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
 #include "interp-defines.h"
 
-    // CAL Top of interpret function
-	jsval_layout tempval;
-    int counter = 0;  // Hack until I figure out how to retrieve js variable values
+
     int offset;
-    std::map<jsbytecode*, int> visited_pc;
     Loop loopdata;
-    jsbytecode* current_loop = NULL;
     std::queue<std::thread> loop_threads;
     bool inloop = false;
     std::map<std::thread::id,std::set<void *>> read;
     std::map<std::thread::id,std::set<void *>> wrote;
+    LoopState state;
+    std::map<jsid, int> getGNameMap;
+    int loopCount = 0;
+    std::vector<int> indexList;
+    jsid loopIndexID;
+
+    std::map<jsbytecode*, int> visited_pc;
+    /*
+     * // CAL Top of interpret function
+    jsval_layout tempval;
+        int counter = 0;  // Hack until I figure out how to retrieve js variable values
+        int offset;
+        std::map<jsbytecode*, int> visited_pc;
+        Loop loopdata;
+        jsbytecode* current_loop = NULL;
+        std::queue<std::thread> loop_threads;
+        bool inloop = false;
+        std::map<std::thread::id,std::set<void *>> read;
+        std::map<std::thread::id,std::set<void *>> wrote;
+    */
+
 
     JSAutoResolveFlags rf(cx, RESOLVE_INFER);
 
@@ -1267,16 +1293,60 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
       do_op:
         //std::cout << "PC:" << offset << " Opcode: " << op << std::endl;
         // GetInstructionType(&notes, offset);
+#ifdef LOOP_PARALLEL	//naomi
+
         if (inloop && offset == loopdata.exit ){
             std::cout << "\nExiting loop\n";
             inloop = false;
+
+            indexList.pop_back();
+
+            int *index = (int *)malloc(sizeof(int) * indexList.size());
+            memcpy(index, &indexList[0], sizeof(int) * indexList.size());
+
+		  #ifdef DEBUG_LOOP_PARALLEL
+            printf("index = ");
+            for(int i=0; i<indexList.size(); i++) {
+            	printf("%d ", index[i]);
+            }
+            printf("\n");
+		  #endif /* DEBUG_LOOP_PARALLEL */
+
+            int nloop = indexList.size();
+            int nthread =  nloop/NUM_LOOP_PER_THREAD;
+
+            int startP, stopP, i;
+
+            for (i = 0; i < nthread; i++) {
+            	startP = i * NUM_LOOP_PER_THREAD;
+            	stopP = startP + NUM_LOOP_PER_THREAD;
+            	/*dprintf("Creating thread %d\n", counter);*/
+
+            	loop_threads.push(std::thread(ThreadInterpret, i, regs.pc, cx, &regs, offset,
+            			original_pc, loopdata.update, &rootValue0, &rootValue1,
+            			&rootObject0, &rootObject1, &rootObject2, &rootId0, &script,
+            			index, startP, stopP, loopIndexID));//, read,wrote));
+            }
+
+            if (nloop % NUM_LOOP_PER_THREAD != 0) {
+            	startP = stopP;
+            	stopP = stopP + (nloop % NUM_LOOP_PER_THREAD);
+            	loop_threads.push(std::thread(ThreadInterpret, i, regs.pc, cx, &regs, offset,
+            	            			original_pc, loopdata.update, &rootValue0, &rootValue1,
+            	            			&rootObject0, &rootObject1, &rootObject2, &rootId0, &script,
+            	            			index, startP, stopP, loopIndexID));//, read,wrote));
+            }
 
             while (!loop_threads.empty()){
             	std::cout << "\nWaiting on thread\n";
                 loop_threads.front().join();
                 loop_threads.pop();
             }
+
+            free(index);
         }
+#endif //LOOP_PARALLEL
+
 
 #ifdef TRACKPC
         printf("PC:\t%d\n", offset);
@@ -1409,15 +1479,19 @@ printf("TRACE: JSOP_LOOPHEAD\n");
 #endif
 
 #ifdef LOOP_PARALLEL
-goto thread_loop;
+goto lp_head;
 #endif
-
 END_EMPTY_CASES
 
 BEGIN_CASE(JSOP_LOOPENTRY)
 #ifdef TRACEIT
 printf("TRACE: JSOP_LOOPENTRY\n");
 #endif
+
+#ifdef LOOP_PARALLEL
+goto lp_entry;
+#endif
+
 END_EMPTY_CASES
 
 BEGIN_CASE(JSOP_LABEL)
@@ -2478,6 +2552,7 @@ BEGIN_CASE(JSOP_CALLNAME)
 #ifdef TRACEIT
     printf("TRACE: JSOP_{GETGNAME,CALLGNAME,NAME,CALLNAME}\n");
 #endif
+
     /* CAL
 	for (std::map<jsbytecode*, int>::iterator it = visited_pc.begin(); it != visited_pc.end(); it++){
         printf("PC: %u\tCount: %d\n", it->first, it->second);
@@ -2485,12 +2560,88 @@ BEGIN_CASE(JSOP_CALLNAME)
     */
     RootedValue &rval = rootValue0;
 
+    printf("#####################sp = %p\n", regs.sp);
+
+
+
+  #ifdef LOOP_PARALLEL
+    jsid nameId;
+    if (inloop && state == ENTRY_STATE) {
+    	RootedPropertyName name(cx, script->getName(regs.pc));
+    	HandleObject scopeChain = IsGlobalOp(JSOp(*regs.pc)) ? cx->global() : cx->fp()->scopeChain();
+    	nameId = NameToId(name);
+    }
+  #endif /* LOOP_PARALLEL */
 
     if (!NameOperation(cx, script, regs.pc, rval.address()))
         goto error;
 
     PUSH_COPY(rval);
     TypeScript::Monitor(cx, script, regs.pc, rval);
+
+    printf("#####################sp = %p\n", regs.sp);
+
+   #ifdef LOOP_PARALLEL
+    if (inloop && state == ENTRY_STATE) {
+    	Value &entryValue = regs.sp[-1];
+    	if (!entryValue.isInt32()) {
+    		fprintf(stderr, "\t Getgname value is not int\n");
+    	    exit(-1);
+    	}
+    	int intValue = entryValue.toInt32();
+    	int elemCount = getGNameMap.count(nameId);
+
+	  #ifdef DEBUG_LOOP_PARALLEL
+    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %d, value=%d, loopCount=%d, elemCount=%d\n"
+    			, nameId, intValue, loopCount, elemCount);
+	  #endif /* DEBUG_LOOP_PARALLEL */
+
+
+    	if (elemCount > 0) {
+    		int oldValue = getGNameMap[nameId];
+
+    		if (intValue != oldValue) {
+    			//found loop index !!!
+    			loopIndexID = nameId;
+
+    			if (loopCount == 1) {
+    				indexList.push_back(oldValue);
+    			}
+    			indexList.push_back(intValue);
+			  #ifdef DEBUG_LOOP_PARALLEL
+    			printf("\t[DLP] loopIndex = {");
+    			for (std::vector<int>::const_iterator elem =  indexList.begin(); elem != indexList.end(); ++elem) {
+    				printf("%d, ", *elem);
+    			}
+    			printf("\n");
+			  #endif
+    		}
+    	} else if (elemCount == 0) {
+    		getGNameMap[nameId] = intValue;
+    	} else {
+    		cerr << "Impossible case numElement < 0?";
+    		exit(-1);
+    	}
+    } else {
+    	//WORKING disable this !!
+
+    	Value &entryValue = regs.sp[-1];
+
+    			if (!entryValue.isInt32()) {
+    	    		fprintf(stderr, "\t Getgname value is not int\n");
+    			} else {
+
+    	    	int intValue = entryValue.toInt32();
+    	    	int elemCount = getGNameMap.count(nameId);
+
+    		  #ifdef DEBUG_LOOP_PARALLEL
+    	    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %d, value=%d, loopCount=%d, elemCount=%d\n"
+    	    			, nameId, intValue, loopCount, elemCount);
+    		  #endif /* DEBUG_LOOP_PARALLEL */
+    			}
+
+    }
+  #endif /* LOOP_PARALLEL */
 }
 END_CASE(JSOP_NAME)
 
@@ -3915,33 +4066,82 @@ END_CASE(JSOP_ARRAYPUSH)
    * CAL This label must be here at the bottom because a goto cannot cross over a
    * variable definition.  This code defines variables.
    */
-  thread_loop:
+
+
+  lp_head:  //sven
+  	  if (inloop) {
+  		  state = HEAD_STATE;
+  		  //skip the loopbody
+          len = 0;
+          regs.pc = loopdata.update + 1;
+          state = UPDATE_STATE;
+          DO_NEXT_OP(len);
+  	  }
+  	  else {
+  		  fprintf(stderr, "Detect loophead but inloop is false");
+  		  exit(-1);
+  	  }
+
+
+
+
+  lp_entry:	//sven
     //std::cout << "PC: " << regs.pc << "\n";
 
+  /*
     // If new loop, reset counter.
     if (regs.pc != current_loop) {
         current_loop = regs.pc;
         counter = 0;
         //regs.sp++;
     }
+  */
 
-    if (notes.loopExists(regs.pc)) {
-        inloop = true;
-        loopdata = notes.getLoop(regs.pc);
-        counter++;
-        
-        dprintf("Creating thread %d\n", counter);
-        loop_threads.push(std::thread(ThreadInterpret, counter, regs.pc, cx, &regs, offset, original_pc, loopdata.update, &rootValue0, &rootValue1,
-        &rootObject0, &rootObject1, &rootObject2, &rootId0, &script));//, read,wrote));
-        //loop_threads.front().join();
-        //loop_threads.pop();
-        // printf("%p\n", regs.sp);
-        //dout << "Thread " << counter << " finished." << endl;
-        len = 0;
-        regs.pc = loopdata.update + 1;
-        DO_NEXT_OP(len);
-    } else {
-        goto advance_pc_by_one;
-    }
+  	if (!inloop) {
+  		if (notes.loopExists(regs.pc)) {
+  			//First iteration of the loop, initialize data
+  			inloop = true;
+  			loopdata = notes.getLoop(regs.pc);
+  			getGNameMap.clear();
+  		    loopCount = 0;
+  		    indexList.clear();
+
+  		    //counter++;
+
+  		        /*dprintf("Creating thread %d\n", counter);
+  		        loop_threads.push(std::thread(ThreadInterpret, counter, regs.pc, cx, &regs, offset, original_pc, loopdata.update, &rootValue0, &rootValue1,
+  		        &rootObject0, &rootObject1, &rootObject2, &rootId0, &script));//, read,wrote));*/
+
+  		        //loop_threads.front().join();
+  		        //loop_threads.pop();
+  		        // printf("%p\n", regs.sp);
+  		        //dout << "Thread " << counter << " finished." << endl;
+
+  		        /*
+  		        len = 0;
+  		        regs.pc = loopdata.update + 1;
+  		        DO_NEXT_OP(len);
+  		        */
+
+  			state = ENTRY_STATE;
+  			goto advance_pc_by_one;
+  		} else {
+  			fprintf(stderr, "Detect loopentry but loop doesn't exist!?");
+  			exit(-1);
+
+  			//goto advance_pc_by_one;
+  		}
+  	} else  {
+  		loopCount++;
+
+	  #ifdef DEBUG_LOOP_PARALLEL
+  		printf("[DLP] update loopCount = %d\n", loopCount);
+	  #endif /* DEBUG_LOOP_PARALLEL */
+
+  		state = ENTRY_STATE;
+  		goto advance_pc_by_one;
+  	}
+
 }
+
 

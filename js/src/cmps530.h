@@ -108,7 +108,7 @@ class ScriptNotes {
                 thisloop.tail = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 2));
                 thisloop.exit = thisloop.tail - original_pc + 6;
                 instr->loopdata = thisloop;
-                this->instruction_notes[thisloop.loophead] = instr;
+                this->instruction_notes[thisloop.loopentry] = instr;
                 //Sprint(sp, " cond %u update %u tail %u",
                        //unsigned(js_GetSrcNoteOffset(sn, 0)),
                        //unsigned(js_GetSrcNoteOffset(sn, 1)),
@@ -179,12 +179,12 @@ class ScriptNotes {
         }
     }
 
-    Loop getLoop(jsbytecode * loophead) {
-        return instruction_notes[loophead]->loopdata;
+    Loop getLoop(jsbytecode * loopentry) {
+        return instruction_notes[loopentry]->loopdata;
     }
 
-    bool loopExists(jsbytecode * loophead) {
-        return (instruction_notes.count(loophead)) ? true:false;
+    bool loopExists(jsbytecode * loopentry) {
+        return (instruction_notes.count(loopentry)) ? true:false;
     }
     
     

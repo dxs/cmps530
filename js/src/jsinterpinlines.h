@@ -385,6 +385,9 @@ NameOperation(JSContext *cx, JSScript *script, jsbytecode *pc, Value *vp)
      * lookup and inspect the results.
      */
 
+    //BANK: TODO: add debug macro here
+    //printf("\t[DLP] id = %d\n", NameToId(name));
+
     RootedObject scope(cx), pobj(cx);
     RootedShape shape(cx);
     if (!LookupName(cx, name, scopeChain, &scope, &pobj, &shape))
