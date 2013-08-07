@@ -69,7 +69,7 @@ class ScriptNotes {
         unsigned colspan = 0;
         unsigned lineno = script->lineno;
         jssrcnote *notes = script->notes();
-        unsigned switchTableEnd = 0, switchTableStart = 0;
+        //unsigned switchTableEnd = 0, switchTableStart = 0;
         // Main decoding loop.  Each iteration corresponds to decoding a 
         // single note.
         for (jssrcnote *sn = notes; !SN_IS_TERMINATOR(sn); sn = SN_NEXT(sn)) {
@@ -131,6 +131,8 @@ class ScriptNotes {
               case SRC_LABELBRACE:
               case SRC_BREAK2LABEL:
               case SRC_CONT2LABEL: {
+                /* Bank: will cauese warning but we are not sure about side
+                 * effects. */ 
                 uint32_t index = js_GetSrcNoteOffset(sn, 0);
                 JSAtom *atom = script->getAtom(index);
                 //Sprint(sp, " atom %u (", index);
@@ -143,11 +145,13 @@ class ScriptNotes {
                 break;
               }
               case SRC_FUNCDEF: {
+                /* Bank: will cauese warning but we are not sure about side
+                 * effects. */ 
                 uint32_t index = js_GetSrcNoteOffset(sn, 0);
                 JSObject *obj = script->getObject(index);
                 JSFunction *fun = obj->toFunction();
                 //JSString *str = JS_DecompileFunction(cx, fun, JS_DONT_PRETTY_PRINT);
-                JSAutoByteString bytes;
+                //JSAutoByteString bytes;
                 //if (!str || !bytes.encode(cx, str))
                 //    ReportException(cx);
                 //Sprint(sp, " function %u (%s)", index, !!bytes ? bytes.ptr() : "N/A");

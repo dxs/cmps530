@@ -880,7 +880,8 @@ JSRuntime::init(uint32_t maxbytes)
 #endif
 
 #ifdef JS_METHODJIT_SPEW
-    JMCheckLogging();
+    /* Bank */
+    //JMCheckLogging();
 #endif
 
     if (!js_InitGC(this, maxbytes))

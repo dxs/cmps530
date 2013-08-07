@@ -214,4 +214,4 @@ AC_DEFUN([MOZ_CXX_SUPPORTS_WARNING],
 
 
 CFLAGS="$CFLAGS -fpermissive"
-CXXFLAGS="$CXXFLAGS -fpermissive -std=c++0x"
+CXXFLAGS="$CXXFLAGS -fpermissive -std=c++0x -pthread -g"

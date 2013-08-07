@@ -57,6 +57,9 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
         Rooted<JSScript*> * script, int* index, int startP, int stopP, jsid loopIndexID)//,
 {
 
+
+        return;
+
 	for(int threadIndex = startP; threadIndex < stopP; threadIndex++) {
 
 		int curIndex = index[threadIndex];
@@ -80,7 +83,7 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		    // Copy stack.
 		    Value temp = *(regs.sp);
 		    regs.sp = &temp;
-		    dprintf("[New Thread] ID: %d, Start: %d, Stop: %d\n", id, regs.pc - original_pc, stop_pc - original_pc);
+		    //dprintf("[New Thread] ID: %d, Start: %d, Stop: %d\n", id, regs.pc - original_pc, stop_pc - original_pc);
 		    // dout << "Thread " << id << ", PC: " << regs.pc - original_pc << ", Stop: " << stop_pc - original_pc << endl;
 		#include "interp-defines.h"
 		    /*
@@ -123,7 +126,7 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		        regs.pc += len; // Set pc (len set by last op to execute)
 		        offset = regs.pc - original_pc ;
 		        op = (JSOp) *(regs.pc); // Get the opcode
-		        dprintf("[Thread %d] PC: %d  Opcode: %d\n", id, offset, op);
+		        //dprintf("[Thread %d] PC: %d  Opcode: %d\n", id, offset, op);
 		        // dout << "PC:" << offset << " Opcode: " << op << std::endl;
 
 		      do_op:
@@ -171,7 +174,7 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		BEGIN_CASE2(JSOP_LABEL)
 		END_CASE(JSOP_LABEL)
 
-		check_backedge:
+		//check_backedge:
 		{
 		    CHECK_BRANCH();
 		    if (op != JSOP_LOOPHEAD)
@@ -215,7 +218,7 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		    }
 		    */
 
-		    printf("#####################sp = %p\n", regs.sp);
+		    printf("#####################sp = %p\n", (void*)regs.sp);
 
 
 		    RootedValue &rval = *rootValue0;
@@ -223,8 +226,9 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		#ifdef LOOP_PARALLEL
 		    jsid nameId;
 
+            /* derive from NameOperation() in jsinterpinlines.h */
 			RootedPropertyName name(cx, (*script)->getName(regs.pc));
-			HandleObject scopeChain = IsGlobalOp(JSOp(*regs.pc)) ? cx->global() : cx->fp()->scopeChain();
+			//HandleObject scopeChain = IsGlobalOp(JSOp(*regs.pc)) ? cx->global() : cx->fp()->scopeChain();
 			nameId = NameToId(name);
 
 		    if (nameId == loopIndexID) {
@@ -239,7 +243,7 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		    	if (!NameOperation(cx, (*script), regs.pc, rval.address()))
 		    		goto error;
 			#ifdef DEBUG_LOOP_PARALLEL
-		    	printf("\t[DLP] getGname rval = %d, nameId=%d\n", rval.toInt32(), nameId);
+		    	printf("\t[DLP] getGname rval = %d, nameId=%ld\n", rval.toInt32(), nameId);
 			#endif /* DEBUG_LOOP_PARALLEL */
 		    	PUSH_COPY_SKIP_CHECK(rval);
 		    	//TypeScript::Monitor(cx, *script, regs.pc, rval);
@@ -249,7 +253,7 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		    //Update the read mask
 		    //WORKING
 
-		    printf("#####################sp = %p\n", regs.sp);
+		    printf("#####################sp = %p\n", (void*)regs.sp);
 
 		#endif /* LOOP_PARALLEL */
 
@@ -347,8 +351,8 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		        fprintf(stderr, "[DLP] SETELEM value is not int32");
 		        exit(-1);
 		    }
-		    printf("[DLP][%d] SETELEM write val=%d to object %p with index = %d\n",
-		           id, value.toInt32(), NULL, tmpv.toInt32());
+		    printf("[DLP][%d] SETELEM write val=%d to object with index = %d\n",
+		           id, value.toInt32(), tmpv.toInt32());
 		  #endif /* DEBUG_LOOP_PARALLEL */
 
 

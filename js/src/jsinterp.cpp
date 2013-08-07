@@ -1306,7 +1306,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
 		  #ifdef DEBUG_LOOP_PARALLEL
             printf("index = ");
-            for(int i=0; i<indexList.size(); i++) {
+            for(unsigned int i=0; i<indexList.size(); i++) {
             	printf("%d ", index[i]);
             }
             printf("\n");
@@ -2560,7 +2560,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     */
     RootedValue &rval = rootValue0;
 
-    printf("#####################sp = %p\n", regs.sp);
+    printf("#####################sp = %p\n", (void*)regs.sp);
 
 
 
@@ -2568,7 +2568,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     jsid nameId;
     if (inloop && state == ENTRY_STATE) {
     	RootedPropertyName name(cx, script->getName(regs.pc));
-    	HandleObject scopeChain = IsGlobalOp(JSOp(*regs.pc)) ? cx->global() : cx->fp()->scopeChain();
+    	//HandleObject scopeChain = IsGlobalOp(JSOp(*regs.pc)) ? cx->global() : cx->fp()->scopeChain();
     	nameId = NameToId(name);
     }
   #endif /* LOOP_PARALLEL */
@@ -2579,7 +2579,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     PUSH_COPY(rval);
     TypeScript::Monitor(cx, script, regs.pc, rval);
 
-    printf("#####################sp = %p\n", regs.sp);
+    printf("#####################sp = %p\n", (void*)regs.sp);
 
    #ifdef LOOP_PARALLEL
     if (inloop && state == ENTRY_STATE) {
@@ -2592,7 +2592,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     	int elemCount = getGNameMap.count(nameId);
 
 	  #ifdef DEBUG_LOOP_PARALLEL
-    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %d, value=%d, loopCount=%d, elemCount=%d\n"
+    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %ld, value=%d, loopCount=%d, elemCount=%d\n"
     			, nameId, intValue, loopCount, elemCount);
 	  #endif /* DEBUG_LOOP_PARALLEL */
 
@@ -2635,7 +2635,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     	    	int elemCount = getGNameMap.count(nameId);
 
     		  #ifdef DEBUG_LOOP_PARALLEL
-    	    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %d, value=%d, loopCount=%d, elemCount=%d\n"
+    	    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %ld, value=%d, loopCount=%d, elemCount=%d\n"
     	    			, nameId, intValue, loopCount, elemCount);
     		  #endif /* DEBUG_LOOP_PARALLEL */
     			}
