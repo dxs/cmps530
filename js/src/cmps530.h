@@ -104,7 +104,7 @@ class ScriptNotes {
                 thisloop.looptype = JSLOOP_FOR;
                 thisloop.loophead = original_pc + offset + 6;
                 thisloop.loopentry = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn,0)) + 1; //cond + 1
-                thisloop.update = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 1));
+                thisloop.update = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 1)) + 1;
                 thisloop.tail = original_pc + offset + unsigned(js_GetSrcNoteOffset(sn, 2));
                 thisloop.exit = thisloop.tail - original_pc + 6;
                 instr->loopdata = thisloop;
@@ -198,11 +198,21 @@ class ScriptNotes {
                                                 it->second->pc, it->second->delta, 
                                                 js_SrcNoteSpec[it->second->type].name);
             if (it->second->type == SRC_FOR) {
-                printf(" head %d entry/cond %d update %d tail %d\n",
+                /*printf(" head %d entry/cond %d update %d tail %d\n",
                         int( it->second->loopdata.loophead - original_pc),
                         int( it->second->loopdata.loopentry - original_pc),
                         int( it->second->loopdata.update - original_pc),
-                        int( it->second->loopdata.tail - original_pc));
+                        int( it->second->loopdata.tail - original_pc)); */
+
+
+                printf(" head %p entry/cond %p update %p tail %p\n",
+                                        (void*)( it->second->loopdata.loophead),
+                                        (void*)( it->second->loopdata.loopentry),
+                                        (void*)( it->second->loopdata.update),
+                                        (void*)( it->second->loopdata.tail));
+
+
+
             } else { printf("\n"); }
         }
     }

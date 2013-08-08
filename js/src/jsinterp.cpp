@@ -20,7 +20,7 @@
 #include "cmps530.h"
 
 /* Manual tracing using individual printfs */
-#define TRACEIT 1
+//#define TRACEIT 1
 /* Trace using the single printf on BEGIN_CASE*/ 
 //#define TRACEAUTO 1
 /* Trace the PC as it executes */
@@ -29,7 +29,7 @@
 #define LOOP_PARALLEL 1
 
 #ifdef LOOP_PARALLEL
-#define NUM_LOOP_PER_THREAD 1
+#define NUM_LOOP_PER_THREAD 10000
 #endif //LOOP_PARALLEL
 
 
@@ -1167,7 +1167,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 
     /* CAL Create script source notes */
     ScriptNotes notes(cx, script, original_pc);
-    // notes.print();
+    notes.print();
 
     /*
      * Pool of rooters for use in this interpreter frame. References to these
@@ -1296,7 +1296,7 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
 #ifdef LOOP_PARALLEL	//naomi
 
         if (inloop && offset == loopdata.exit ){
-            std::cout << "\nExiting loop\n";
+            std::cout << "\nAfter loop, start spawning threads\n";
             inloop = false;
 
             indexList.pop_back();
@@ -1315,30 +1315,37 @@ js::Interpret(JSContext *cx, StackFrame *entryFrame, InterpMode interpMode)
             int nloop = indexList.size();
             int nthread =  nloop/NUM_LOOP_PER_THREAD;
 
-            int startP, stopP, i;
+            int startP = 0, stopP = 0, i = 0;
 
             for (i = 0; i < nthread; i++) {
+
             	startP = i * NUM_LOOP_PER_THREAD;
             	stopP = startP + NUM_LOOP_PER_THREAD;
             	/*dprintf("Creating thread %d\n", counter);*/
 
-            	loop_threads.push(std::thread(ThreadInterpret, i, regs.pc, cx, &regs, offset,
+            	loop_threads.push(std::thread(ThreadInterpret, i, loopdata.loophead, cx, &regs, offset,
             			original_pc, loopdata.update, &rootValue0, &rootValue1,
             			&rootObject0, &rootObject1, &rootObject2, &rootId0, &script,
             			index, startP, stopP, loopIndexID));//, read,wrote));
+
+			  #ifdef DEBUG_LOOP_PARALLEL
+            	printf("[%d] spawn thread, startP=%d, stopP=%d\n", i, startP, stopP);
+		  	  #endif /* DEBUG_LOOP_PARALLEL */
             }
 
             if (nloop % NUM_LOOP_PER_THREAD != 0) {
             	startP = stopP;
             	stopP = stopP + (nloop % NUM_LOOP_PER_THREAD);
-            	loop_threads.push(std::thread(ThreadInterpret, i, regs.pc, cx, &regs, offset,
+            	loop_threads.push(std::thread(ThreadInterpret, i, loopdata.loophead, cx, &regs, offset,
             	            			original_pc, loopdata.update, &rootValue0, &rootValue1,
             	            			&rootObject0, &rootObject1, &rootObject2, &rootId0, &script,
             	            			index, startP, stopP, loopIndexID));//, read,wrote));
             }
 
             while (!loop_threads.empty()){
-            	std::cout << "\nWaiting on thread\n";
+#ifdef DEBUG_LOOP_PARALLEL
+            	std::cout << "Waiting on thread\n";
+#endif //DEBUG_LOOP_PARALLEL
                 loop_threads.front().join();
                 loop_threads.pop();
             }
@@ -2559,9 +2566,9 @@ BEGIN_CASE(JSOP_CALLNAME)
     }
     */
     RootedValue &rval = rootValue0;
-
-    printf("#####################sp = %p\n", (void*)regs.sp);
-
+#ifdef DEBUG_LOOP_PARALLEL
+    printf("#####################sp = %p, pc=%p\n", (void*)regs.sp, (void*)regs.pc);
+#endif //DEBUG_LOOP_PARALLEL
 
 
   #ifdef LOOP_PARALLEL
@@ -2579,7 +2586,9 @@ BEGIN_CASE(JSOP_CALLNAME)
     PUSH_COPY(rval);
     TypeScript::Monitor(cx, script, regs.pc, rval);
 
-    printf("#####################sp = %p\n", (void*)regs.sp);
+#ifdef DEBUG_LOOP_PARALLEL
+    printf("#####################sp = %p, pc=%p\n", (void*)regs.sp, (void*)regs.pc);
+#endif //DEBUG_LOOP_PARALLEL
 
    #ifdef LOOP_PARALLEL
     if (inloop && state == ENTRY_STATE) {
@@ -2625,7 +2634,7 @@ BEGIN_CASE(JSOP_CALLNAME)
     } else {
     	//WORKING disable this !!
 
-    	Value &entryValue = regs.sp[-1];
+    	/*Value &entryValue = regs.sp[-1];
 
     			if (!entryValue.isInt32()) {
     	    		fprintf(stderr, "\t Getgname value is not int\n");
@@ -2637,9 +2646,8 @@ BEGIN_CASE(JSOP_CALLNAME)
     		  #ifdef DEBUG_LOOP_PARALLEL
     	    	printf("\t[DLP] call NameOperation() from JSOP_{GETG,CALLG,,CALL}NAME, with id = %ld, value=%d, loopCount=%d, elemCount=%d\n"
     	    			, nameId, intValue, loopCount, elemCount);
-    		  #endif /* DEBUG_LOOP_PARALLEL */
-    			}
-
+    		  #endif //DEBUG_LOOP_PARALLEL     			}
+    	*/
     }
   #endif /* LOOP_PARALLEL */
 }
@@ -2670,6 +2678,9 @@ BEGIN_CASE(JSOP_UINT24)
 END_CASE(JSOP_UINT24)
 
 BEGIN_CASE(JSOP_INT8)
+#ifdef TRACEIT
+    printf("TRACE: JSOP_INT8\n");
+#endif
     PUSH_INT32(GET_INT8(regs.pc));
 END_CASE(JSOP_INT8)
 
@@ -4073,7 +4084,7 @@ END_CASE(JSOP_ARRAYPUSH)
   		  state = HEAD_STATE;
   		  //skip the loopbody
           len = 0;
-          regs.pc = loopdata.update + 1;
+          regs.pc = loopdata.update;
           state = UPDATE_STATE;
           DO_NEXT_OP(len);
   	  }
