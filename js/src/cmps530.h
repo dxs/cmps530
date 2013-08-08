@@ -194,7 +194,7 @@ class ScriptNotes {
     
     void print() {
         for (instr_map_iter it = instruction_notes.begin(); it != instruction_notes.end(); ++it){
-            printf("%3u: %4u %5u [%4u] %-8s", it->second->ofs, it->second->line, 
+            printf("%3u: %4u %5u [%4u] %-8s\n", it->second->ofs, it->second->line,
                                                 it->second->pc, it->second->delta, 
                                                 js_SrcNoteSpec[it->second->type].name);
             if (it->second->type == SRC_FOR) {
@@ -205,7 +205,7 @@ class ScriptNotes {
                         int( it->second->loopdata.tail - original_pc)); */
 
 
-                printf(" head %p entry/cond %p update %p tail %p\n",
+                printf("head %p entry/cond %p update %p tail %p\n",
                                         (void*)( it->second->loopdata.loophead),
                                         (void*)( it->second->loopdata.loopentry),
                                         (void*)( it->second->loopdata.update),

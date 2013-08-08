@@ -4,6 +4,7 @@
 // Uncomment to turn on debugging output for this file.
 //#define DOUT2
 //#define DEBUG_LOOP_PARALLEL
+#define DEBUG_THREAD_WRITE
 
 // Hack to get around the fact that it's defined in jsinterp.
 #undef dout
@@ -52,10 +53,17 @@ using namespace std;
  * change the accesses accordingly.
  */
 JS_NEVER_INLINE void
-ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, 
+ThreadInterpret(int id, jsbytecode* start_pc, JSContext *original_cx, FrameRegs * orig_regs, int offset, jsbytecode *original_pc, jsbytecode *stop_pc, 
         RootedValue *rootValue0, RootedValue *rootValue1, RootedObject *rootObject0, RootedObject *rootObject1, RootedObject *rootObject2, RootedId *rootId0,
-        Rooted<JSScript*> * script, int* index, int startP, int stopP, jsid loopIndexID)//,
+        Rooted<JSScript*> * script, int* index, int startP, int stopP, jsid loopIndexID, bool enableWrite)//,
 {
+    //JSContext *cx = (JSContext *)malloc(sizeof(JSContext));
+    //memcpy(cx, original_cx, sizeof(JSContext));// don't forget the free(cx);
+
+	JSContext *cx = original_cx;
+
+
+
 	//return;
 	//Rooted<JSScript*> script(cx);
 	//SET_SCRIPT(regs.fp()->script());
@@ -319,22 +327,28 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		BEGIN_CASE2(JSOP_SETGNAME)
 		BEGIN_CASE2(JSOP_SETNAME)
 		{
-		#ifdef TRACEIT
-		    printf("TRACE(thread): JSOP_{SETGNAME,SETNAME}\n");
-		#endif
-		    RootedObject &scope = *rootObject0;
-		    scope = &regs.sp[-2].toObject();
+			if (enableWrite) {
+			  #ifdef TRACEIT
+				printf("TRACE(thread): JSOP_{SETGNAME,SETNAME}\n");
+			  #endif
+		    	RootedObject &scope = *rootObject0;
+		    	scope = &regs.sp[-2].toObject();
 
-		    HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
+		    	HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
 
-		    if (!SetNameOperation(cx, *script, regs.pc, scope, value)) {
-		    	printf("[%d][ERR] JSOP_{SETGNAME,SETNAME}.SetNameOperation()", id);
-		    	goto error;
-		    }
+		    	if (!SetNameOperation(cx, *script, regs.pc, scope, value)) {
+		    		printf("[%d][ERR] JSOP_{SETGNAME,SETNAME}.SetNameOperation()", id);
+		    		goto error;
+		    	}
+		    	wrote.insert(value.ptr->data.asPtr);
 
-		    wrote.insert(value.ptr->data.asPtr);
-
-		    regs.sp[-2] = regs.sp[-1];
+		    	regs.sp[-2] = regs.sp[-1];
+			}
+			else {
+			  #ifdef DEBUG_THREAD_WRITE
+				printf("JSOP_{SETGNAME,SETNAME} skip\n");
+			  #endif //DEBUG_THREAD_WRITE
+			}
 		    regs.sp--;
 		}
 		END_CASE(JSOP_SETNAME)
@@ -348,42 +362,47 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 
 		BEGIN_CASE2(JSOP_SETELEM)
 		{
-		  #ifdef TRACEIT
-		    printf("TRACE(thread): JSOP_SETELEM\n");
-		  #endif
+			if (enableWrite) {
+		  	  #ifdef TRACEIT
+				printf("TRACE(thread): JSOP_SETELEM\n");
+		  	  #endif
 
-		  #ifdef DEBUG_LOOP_PARALLEL
-		    Value tmpv = regs.sp[-2]; //examine ID
-		    if (!tmpv.isInt32()) {
-		        fprintf(stderr, "[DLP] SETELEM index is not int32");
-		        exit(-1);
-		    }
-		    printf("[DLP][%d] SETELEM index=%d\n", id, tmpv.toInt32());
-		  #endif /* DEBUG_LOOP_PARALLEL */
+		  	  #ifdef DEBUG_LOOP_PARALLEL
+				Value tmpv = regs.sp[-2]; //examine ID
+				if (!tmpv.isInt32()) {
+					fprintf(stderr, "[DLP] SETELEM index is not int32");
+					exit(-1);
+				}
+				printf("[DLP][%d] SETELEM index=%d\n", id, tmpv.toInt32());
+		  	  #endif /* DEBUG_LOOP_PARALLEL */
 
-		    RootedObject &obj = *rootObject0;
-		    FETCH_OBJECT(cx, -3, obj);
-		    RootedId &rid = *rootId0;
-		    FETCH_ELEMENT_ID(obj, -2, rid);
-		    Value &value = regs.sp[-1];
-		    if (!SetObjectElementOperation(cx, obj, rid, value, (*script)->strictModeCode)) {
-		    	printf("[%d][ERR] JSOP_SETELEM.SetObjectElementOperation()", id);
-		        goto error;
-		    }
-		    regs.sp[-3] = value;
+				RootedObject &obj = *rootObject0;
+				FETCH_OBJECT(cx, -3, obj);
+				RootedId &rid = *rootId0;
+				FETCH_ELEMENT_ID(obj, -2, rid);
+				Value &value = regs.sp[-1];
+				if (!SetObjectElementOperation(cx, obj, rid, value, (*script)->strictModeCode)) {
+					printf("[%d][ERR] JSOP_SETELEM.SetObjectElementOperation()", id);
+					goto error;
+				}
+				regs.sp[-3] = value;
+
+			  #ifdef DEBUG_LOOP_PARALLEL
+				if (!value.isInt32()) {
+					fprintf(stderr, "[DLP] SETELEM value is not int32");
+					exit(-1);
+				}
+				printf("[DLP][%d] SETELEM write val=%d to object with index = %d\n",
+						id, value.toInt32(), tmpv.toInt32());
+			  #endif /* DEBUG_LOOP_PARALLEL */
+			}
+			else {
+			  #ifdef DEBUG_THREAD_WRITE
+				printf("JSOP_SETELEM skip\n");
+			  #endif //DEBUG_THREAD_WRITE
+			}
+
 		    regs.sp -= 2;
-
-
-		  #ifdef DEBUG_LOOP_PARALLEL
-		    if (!value.isInt32()) {
-		        fprintf(stderr, "[DLP] SETELEM value is not int32");
-		        exit(-1);
-		    }
-		    printf("[DLP][%d] SETELEM write val=%d to object with index = %d\n",
-		           id, value.toInt32(), tmpv.toInt32());
-		  #endif /* DEBUG_LOOP_PARALLEL */
-
-
 
 		/*
 		    RootedObject &obj = *rootObject0;
@@ -473,13 +492,11 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 
 		BEGIN_CASE2(JSOP_GETELEM)
 		BEGIN_CASE2(JSOP_CALLELEM)
-		{
-		    std::cout << "JSOP_GETELEM AND JSOP_CALLELEM currently giving problems\n";
-		    goto error;
-		#ifdef TRACEIT
-		    printf("TRACE(thread): JSOP_{GETELEM,CALLELEM)\n");
-		#endif
-		    MutableHandleValue lval = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
+		{ //nao
+		    /*std::cout << "JSOP_GETELEM AND JSOP_CALLELEM currently giving problems\n";
+		    goto error;*/
+
+		    /*MutableHandleValue lval = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
 		    HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
 
 		    MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
@@ -488,7 +505,21 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 		        std::cout << "Thread failed to GET or CALL ELEM. PC: " << offset << std::endl;
 		        goto error;
 		    // TypeScript::Monitor(cx, script, regs.pc, res);
-		    regs.sp--;
+		    regs.sp--;*/
+		  #ifdef TRACEIT
+			printf("TRACE(thread): JSOP_{GETELEM,CALLELEM}\n");
+		  #endif
+		    MutableHandleValue lval = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
+		       HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
+
+		       MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
+		       if (!GetElementOperation(cx, op, lval, rval, res)){
+
+		    	   printf("JSOP_{GETELEM, CALLELEM}.GetElementOperation()\n");
+		           goto error;
+		       }
+		       TypeScript::Monitor(cx, *script, regs.pc, res);
+		       regs.sp--;
 		}
 		END_CASE(JSOP_GETELEM)
 
@@ -526,5 +557,5 @@ ThreadInterpret(int id, jsbytecode* start_pc, JSContext *cx, FrameRegs * orig_re
 
 	} //end of big for loop
 
-
+    //free(cx);
 } // end of function ThreadInterpret
